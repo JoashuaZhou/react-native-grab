@@ -1,0 +1,185 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getRenderedBy = void 0;
+const symbolicate_1 = require("./symbolicate");
+const restoreStackDescriptor = (error, descriptor) => {
+    try {
+        if (descriptor) {
+            Object.defineProperty(error, "stack", descriptor);
+        }
+        else {
+            delete error.stack;
+        }
+    }
+    catch {
+        // Best effort only. Some runtimes may prevent restoring non-configurable properties.
+    }
+};
+const firstUserFrameFromError = (error) => {
+    const stackDescriptorBeforeCallSites = Object.getOwnPropertyDescriptor(error, "stack");
+    let callSites = null;
+    const prev = Error.prepareStackTrace;
+    try {
+        Error.prepareStackTrace = (_, sites) => {
+            callSites = sites;
+            return "";
+        };
+        void error.stack;
+    }
+    finally {
+        Error.prepareStackTrace = prev;
+        restoreStackDescriptor(error, stackDescriptorBeforeCallSites);
+    }
+    if (callSites && callSites.length > 0) {
+        const sites = callSites;
+        let start = 0;
+        for (let i = 0; i < Math.min(sites.length, 3); i++) {
+            const fn = sites[i].getFunctionName() ?? "";
+            if (fn.includes("react-stack-top-frame") ||
+                fn.includes("react_stack_bottom_frame") ||
+                fn === "") {
+                start = i + 1;
+            }
+            else {
+                break;
+            }
+        }
+        for (let i = start; i < sites.length; i++) {
+            const fn = sites[i].getFunctionName() ?? "";
+            if (fn.includes("react_stack_bottom_frame") || fn.includes("react-stack-bottom-frame")) {
+                break;
+            }
+            const file = sites[i].getFileName();
+            if (!file)
+                continue;
+            return {
+                file,
+                line: sites[i].getLineNumber(),
+                column: sites[i].getColumnNumber(),
+            };
+        }
+        return null;
+    }
+    const stackDescriptorBeforeString = Object.getOwnPropertyDescriptor(error, "stack");
+    const prevStr = Error.prepareStackTrace;
+    let stack = "";
+    try {
+        Error.prepareStackTrace = undefined;
+        stack = error.stack ?? "";
+    }
+    finally {
+        Error.prepareStackTrace = prevStr;
+        restoreStackDescriptor(error, stackDescriptorBeforeString);
+    }
+    if (stack.startsWith("Error: react-stack-top-frame\n")) {
+        stack = stack.slice("Error: react-stack-top-frame\n".length);
+    }
+    for (let i = 0; i < 2; i++) {
+        const nl = stack.indexOf("\n");
+        if (nl !== -1)
+            stack = stack.slice(nl + 1);
+    }
+    const sentinelIdx = stack.search(/react[_-]stack[_-]bottom[_-]frame/);
+    if (sentinelIdx !== -1) {
+        const cut = stack.lastIndexOf("\n", sentinelIdx);
+        if (cut !== -1)
+            stack = stack.slice(0, cut);
+    }
+    const firstLine = stack.split("\n").find((l) => l.trim());
+    if (!firstLine)
+        return null;
+    const v8 = firstLine.match(/at\s+(?:.+?\s+\()?(.+):(\d+):(\d+)\)?$/);
+    if (v8) {
+        return { file: v8[1], line: parseInt(v8[2], 10), column: parseInt(v8[3], 10) };
+    }
+    const gecko = firstLine.match(/@(.+):(\d+):(\d+)$/);
+    if (gecko) {
+        return { file: gecko[1], line: parseInt(gecko[2], 10), column: parseInt(gecko[3], 10) };
+    }
+    return null;
+};
+const getNameFromFiber = (fiber) => {
+    const type = fiber?.type;
+    if (!type)
+        return "(unknown)";
+    if (typeof type === "function") {
+        return type.displayName || type.name || "(anonymous)";
+    }
+    if (typeof type === "string") {
+        return type;
+    }
+    if (type.render) {
+        return type.displayName || type.render.displayName || type.render.name || "ForwardRef";
+    }
+    if (type.type) {
+        const inner = type.type;
+        return (type.displayName ||
+            (typeof inner === "function" ? inner.displayName || inner.name : null) ||
+            "Memo");
+    }
+    return "(unknown)";
+};
+const getRenderedByFrames = (fiber) => {
+    const result = [];
+    let current = fiber;
+    while (current) {
+        const owner = current._debugOwner;
+        const debugStack = current._debugStack;
+        if (!owner)
+            break;
+        const name = getNameFromFiber(owner);
+        if (!debugStack) {
+            result.push({ name, file: null, line: null, column: null, collapse: false });
+            current = owner;
+            continue;
+        }
+        const loc = typeof debugStack === "string"
+            ? (() => {
+                const m = debugStack.match(/at\s+(?:.+?\s+\()?(.+):(\d+):(\d+)\)?/);
+                return m ? { file: m[1], line: parseInt(m[2], 10), column: parseInt(m[3], 10) } : null;
+            })()
+            : firstUserFrameFromError(debugStack);
+        result.push({
+            name,
+            file: loc?.file ?? null,
+            line: loc?.line ?? null,
+            column: loc?.column ?? null,
+            collapse: false,
+        });
+        current = owner;
+    }
+    return result;
+};
+const toMetroStackFrame = (frame) => {
+    return {
+        methodName: frame.name,
+        file: frame.file ?? undefined,
+        lineNumber: frame.line ?? undefined,
+        column: frame.column ?? undefined,
+        collapse: frame.collapse,
+    };
+};
+const getRenderedBy = async (fiber) => {
+    const frames = getRenderedByFrames(fiber);
+    if (frames.length === 0)
+        return frames;
+    try {
+        const metroFrames = frames.map(toMetroStackFrame);
+        const { stack: symbolicated } = await (0, symbolicate_1.symbolicateStackTrace)(metroFrames);
+        const compatibleStack = symbolicated;
+        return compatibleStack
+            .filter((sf) => sf.collapse !== true)
+            .map((sf, i) => ({
+            name: frames[i]?.name ?? sf.methodName,
+            file: sf.file ?? null,
+            line: sf.lineNumber ?? null,
+            column: sf.column ?? null,
+            collapse: sf.collapse === true,
+        }));
+    }
+    catch {
+        return frames;
+    }
+};
+exports.getRenderedBy = getRenderedBy;
+//# sourceMappingURL=get-rendered-by.js.map

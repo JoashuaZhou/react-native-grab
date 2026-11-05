@@ -1,0 +1,1 @@
+{"version":3,"file":"fabric.js","sourceRoot":"","sources":["../../../src/react-native/fabric.ts"],"names":[],"mappings":"AAwBA,MAAM,CAAC,MAAM,kBAAkB,GAAG,GAAoB,EAAE;IACtD,IAAI,OAAO,qBAAqB,KAAK,WAAW,EAAE,CAAC;QACjD,MAAM,IAAI,KAAK,CAAC,qEAAqE,CAAC,CAAC;IACzF,CAAC;IAED,OAAO,qBAAqB,CAAC;AAC/B,CAAC,CAAC"}

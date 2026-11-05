@@ -1,0 +1,2 @@
+export declare const withReactNativeGrab: <T extends import("metro-config-transformers").AnyMetroConfig>(input: T, options?: void | undefined) => import("metro-config-transformers").MutatedType<T>;
+//# sourceMappingURL=withReactNativeGrab.d.ts.map

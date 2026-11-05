@@ -24,8 +24,11 @@ Bridge the context gap: point at the exact native UI element, capture precise so
 
 ## Installation
 
+This fork's `custom` branch includes prebuilt `dist` files for installation directly from Git.
+When changing source, run `npm run build` and commit the updated `dist` files together.
+
 ```bash
-npm install react-native-grab react-native-safe-area-context
+npm install 'git+https://github.com/JoashuaZhou/react-native-grab.git#custom' react-native-safe-area-context
 ```
 
 `react-native-safe-area-context` is required to place the iOS grab toolbar below the initial

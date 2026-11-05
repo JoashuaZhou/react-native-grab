@@ -1,0 +1,1 @@
+{"version":3,"file":"grab-overlay.d.ts","sourceRoot":"","sources":["../../../src/react-native/grab-overlay.tsx"],"names":[],"mappings":"AACA,OAAO,EAOL,KAAK,wBAAwB,EAC9B,MAAM,cAAc,CAAC;AAiCtB,MAAM,MAAM,2BAA2B,GAAG;IACxC,OAAO,EAAE,MAAM,CAAC;IAChB,mBAAmB,CAAC,EAAE,CAAC,WAAW,EAAE,wBAAwB,GAAG,IAAI,KAAK,IAAI,CAAC;CAC9E,CAAC;AAEF,eAAO,MAAM,sBAAsB,GAAI,mCAGpC,2BAA2B,mDA2X7B,CAAC"}

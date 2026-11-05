@@ -1,0 +1,2 @@
+# Keep TypeScript output and source maps in sync.
+dist/

@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# The custom branch tracks dist for installation directly from Git.
 coverage/
 
 .DS_Store

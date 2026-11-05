@@ -1,0 +1,1 @@
+{"version":3,"file":"dev-server.d.ts","sourceRoot":"","sources":["../../../src/react-native/dev-server.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,aAAa,GAAG;IAC1B,GAAG,EAAE,MAAM,CAAC;IACZ,aAAa,EAAE,MAAM,GAAG,IAAI,CAAC;IAC7B,sBAAsB,EAAE,OAAO,CAAC;CACjC,CAAC;AA2BF;;;;;GAKG;AACH,eAAO,MAAM,YAAY,QAAO,aAa/B,CAAC;AAEF,eAAO,MAAM,mBAAmB,QAAO,IAGtC,CAAC"}
