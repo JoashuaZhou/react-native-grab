@@ -7,6 +7,7 @@ import { ContextMenu } from "./context-menu";
 import { GRAB_BADGE_BACKGROUND, GRAB_HIGHLIGHT_FILL, GRAB_PRIMARY } from "./grab-colors";
 import { clearGrabOwnerPresentation, hideGrabSelectionMenu, registerLocalGrabSelectionController, setGrabSelectionSessionOwner, showGrabSelectionMenu, unregisterLocalGrabSelectionController, } from "./grab-controller";
 import { getDescription, getGrabSelectionTitle } from "./description";
+import { getOpenFrame } from "./get-open-frame";
 import { getRenderedBy } from "./get-rendered-by";
 import { findNodeAtPoint, getFabricWindowOffset, measureInWindow } from "./measure";
 import { openStackFrameInEditor } from "./open";
@@ -123,7 +124,7 @@ export const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             getDescription(result.fiberNode),
             getRenderedBy(result.fiberNode),
         ]);
-        const firstFrame = renderedBy.find((frame) => Boolean(frame.file)) ?? null;
+        const openFrame = getOpenFrame(renderedBy);
         const elementName = getGrabSelectionTitle(result.fiberNode, renderedBy);
         setState((prev) => ({
             ...prev,
@@ -131,7 +132,7 @@ export const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             selectedElement: {
                 description,
                 elementName,
-                frame: firstFrame,
+                frame: openFrame,
                 result,
             },
         }));

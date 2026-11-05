@@ -21,6 +21,7 @@ import {
   unregisterLocalGrabSelectionController,
 } from "./grab-controller";
 import { getDescription, getGrabSelectionTitle } from "./description";
+import { getOpenFrame } from "./get-open-frame";
 import { getRenderedBy, type RenderedByFrame } from "./get-rendered-by";
 import { findNodeAtPoint, getFabricWindowOffset, measureInWindow } from "./measure";
 import { openStackFrameInEditor } from "./open";
@@ -188,7 +189,7 @@ export const ReactNativeGrabOverlay = ({
         getRenderedBy(result.fiberNode),
       ]);
 
-      const firstFrame = renderedBy.find((frame) => Boolean(frame.file)) ?? null;
+      const openFrame = getOpenFrame(renderedBy);
       const elementName = getGrabSelectionTitle(result.fiberNode, renderedBy);
 
       setState((prev) => ({
@@ -197,7 +198,7 @@ export const ReactNativeGrabOverlay = ({
         selectedElement: {
           description,
           elementName,
-          frame: firstFrame,
+          frame: openFrame,
           result,
         },
       }));

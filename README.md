@@ -43,6 +43,15 @@ The toolbar uses the initial window metrics and does not require a `SafeAreaProv
 4. Wrap content hosted in a separately presented native sheet or modal with `ReactNativeGrabSurface` and set `active` only while it is presented.
 5. Open Dev Menu and choose `React Native Grab` to start selecting elements.
 
+### Opening a selected element
+
+For any selected element, **Open** uses the nearest source location in its rendered-by
+stack with a file and a positive integer line number, preferring paths outside
+`node_modules`. If only dependency locations are available, it opens the first valid one.
+If no valid location is available, Open is disabled. The target is a JSX creation location
+provided by the source stack; shared components can therefore lead to their own JSX.
+**Copy** keeps the existing source context, including dependency frames.
+
 ## Quick Configuration Example
 
 ```javascript

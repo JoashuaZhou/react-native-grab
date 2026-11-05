@@ -10,6 +10,7 @@ const context_menu_1 = require("./context-menu");
 const grab_colors_1 = require("./grab-colors");
 const grab_controller_1 = require("./grab-controller");
 const description_1 = require("./description");
+const get_open_frame_1 = require("./get-open-frame");
 const get_rendered_by_1 = require("./get-rendered-by");
 const measure_1 = require("./measure");
 const open_1 = require("./open");
@@ -126,7 +127,7 @@ const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             (0, description_1.getDescription)(result.fiberNode),
             (0, get_rendered_by_1.getRenderedBy)(result.fiberNode),
         ]);
-        const firstFrame = renderedBy.find((frame) => Boolean(frame.file)) ?? null;
+        const openFrame = (0, get_open_frame_1.getOpenFrame)(renderedBy);
         const elementName = (0, description_1.getGrabSelectionTitle)(result.fiberNode, renderedBy);
         setState((prev) => ({
             ...prev,
@@ -134,7 +135,7 @@ const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             selectedElement: {
                 description,
                 elementName,
-                frame: firstFrame,
+                frame: openFrame,
                 result,
             },
         }));
