@@ -243,7 +243,7 @@ export const ContextMenu = ({
       return [
         {
           key: "full",
-          style: StyleSheet.absoluteFillObject,
+          style: StyleSheet.absoluteFill,
         },
       ];
     }
@@ -354,7 +354,7 @@ ContextMenu.Item = ContextMenuItem;
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 10,
     elevation: 10,
   },

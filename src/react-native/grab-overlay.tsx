@@ -431,7 +431,7 @@ export const ReactNativeGrabOverlay = ({
 
 const styles = StyleSheet.create({
   overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
   },
   topBadge: {

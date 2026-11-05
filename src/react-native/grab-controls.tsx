@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, PanResponder, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import {
+  Animated,
+  PanResponder,
+  Platform,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import { FullScreenOverlay } from "./full-screen-overlay";
 import { enableGrabbing, toggleGrabMenu, useGrabControllerState } from "./grab-controller";
 import { GrabControlBar } from "./grab-control-bar";
 
 const BAR_HEIGHT = 36;
 const BAR_WIDTH = 108;
-const BAR_TOP_INSET = 72;
+const BAR_TOP_INSET = 72 + (Platform.OS === "ios" ? (initialWindowMetrics?.insets.top ?? 0) : 0);
 
 type ControlsBounds = {
   width: number;
@@ -74,6 +82,9 @@ export const GrabOwnerControls = () => {
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { width, height } = event.nativeEvent.layout;
+      if (width <= 0 || height <= 0) {
+        return;
+      }
       const previousBounds = boundsRef.current;
 
       if (previousBounds?.width === width && previousBounds.height === height) {
@@ -160,11 +171,11 @@ export const GrabOwnerControls = () => {
 
 const styles = StyleSheet.create({
   overlayAnchor: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
   },
   overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
   },
   controlBar: {

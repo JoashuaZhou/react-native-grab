@@ -25,8 +25,12 @@ Bridge the context gap: point at the exact native UI element, capture precise so
 ## Installation
 
 ```bash
-npm install react-native-grab
+npm install react-native-grab react-native-safe-area-context
 ```
+
+`react-native-safe-area-context` is required to place the iOS grab toolbar below the initial
+window safe area. If it is already installed, no additional setup is needed for Grab.
+The toolbar uses the initial window metrics and does not require a `SafeAreaProvider`.
 
 ## Quick Start
 

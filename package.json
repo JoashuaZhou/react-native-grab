@@ -74,6 +74,7 @@
     "expo-router": "*",
     "react": ">=19",
     "react-native": ">=0.80",
+    "react-native-safe-area-context": "*",
     "react-native-screens": "*"
   },
   "peerDependenciesMeta": {
