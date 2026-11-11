@@ -3,9 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.withReactNativeGrab = void 0;
 const node_child_process_1 = require("node:child_process");
 const metro_config_transformers_1 = require("metro-config-transformers");
+const http_1 = require("./review/http");
+const module_1 = require("./review/module");
 const MAX_BODY_BYTES = 1024 * 512;
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const COPY_ROUTE = "/__react-native-grab/copy";
+const REVIEW_DIR_ENV = "RN_GRAB_REVIEW_DIR";
 const tryCopy = (command, args, text) => {
     try {
         (0, node_child_process_1.execFileSync)(command, args, { input: text });
@@ -102,10 +105,41 @@ const handleCopyRequest = (req, res) => {
         sendJson(res, 200, { ok: true });
     });
 };
+let cachedReviewModule = null;
+let cachedReviewModuleDir = null;
+const resolveReviewModule = (dir) => {
+    if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
+        return cachedReviewModule;
+    }
+    try {
+        cachedReviewModule = (0, module_1.createReviewModule)(dir);
+        cachedReviewModuleDir = dir;
+        return cachedReviewModule;
+    }
+    catch {
+        cachedReviewModule = null;
+        cachedReviewModuleDir = null;
+        return null;
+    }
+};
 const handleReactNativeGrabRequest = (req, res, next) => {
     const pathname = getPathname(req);
     if (pathname === COPY_ROUTE) {
         handleCopyRequest(req, res);
+        return;
+    }
+    if (pathname.startsWith(http_1.REVIEW_ROUTE_PREFIX)) {
+        const reviewDir = process.env[REVIEW_DIR_ENV];
+        if (reviewDir === undefined || reviewDir === "") {
+            sendJson(res, 404, { ok: false, error: "no_active_review" });
+            return;
+        }
+        const reviewModule = resolveReviewModule(reviewDir);
+        if (reviewModule === null) {
+            sendJson(res, 500, { ok: false, error: "internal" });
+            return;
+        }
+        reviewModule.handler(req, res, next);
         return;
     }
     next();

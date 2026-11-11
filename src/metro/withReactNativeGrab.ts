@@ -3,9 +3,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { createMetroConfigTransformer } from "metro-config-transformers";
 
+import { REVIEW_ROUTE_PREFIX } from "./review/http";
+import { createReviewModule } from "./review/module";
+
 const MAX_BODY_BYTES = 1024 * 512;
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const COPY_ROUTE = "/__react-native-grab/copy";
+const REVIEW_DIR_ENV = "RN_GRAB_REVIEW_DIR";
 
 type JsonObject = Record<string, unknown>;
 type NextFn = () => void;
@@ -127,6 +131,26 @@ const handleCopyRequest = (req: IncomingMessage, res: ServerResponse) => {
   });
 };
 
+type ReviewModule = ReturnType<typeof createReviewModule>;
+
+let cachedReviewModule: ReviewModule | null = null;
+let cachedReviewModuleDir: string | null = null;
+
+const resolveReviewModule = (dir: string): ReviewModule | null => {
+  if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
+    return cachedReviewModule;
+  }
+  try {
+    cachedReviewModule = createReviewModule(dir);
+    cachedReviewModuleDir = dir;
+    return cachedReviewModule;
+  } catch {
+    cachedReviewModule = null;
+    cachedReviewModuleDir = null;
+    return null;
+  }
+};
+
 const handleReactNativeGrabRequest = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -136,6 +160,21 @@ const handleReactNativeGrabRequest = (
 
   if (pathname === COPY_ROUTE) {
     handleCopyRequest(req, res);
+    return;
+  }
+
+  if (pathname.startsWith(REVIEW_ROUTE_PREFIX)) {
+    const reviewDir = process.env[REVIEW_DIR_ENV];
+    if (reviewDir === undefined || reviewDir === "") {
+      sendJson(res, 404, { ok: false, error: "no_active_review" });
+      return;
+    }
+    const reviewModule = resolveReviewModule(reviewDir);
+    if (reviewModule === null) {
+      sendJson(res, 500, { ok: false, error: "internal" });
+      return;
+    }
+    reviewModule.handler(req, res, next);
     return;
   }
 
