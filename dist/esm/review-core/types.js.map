@@ -1,0 +1,1 @@
+{"version":3,"file":"types.js","sourceRoot":"","sources":["../../../src/review-core/types.ts"],"names":[],"mappings":"AAkHA,MAAM,CAAC,MAAM,aAAa,GAA+B;IACvD,KAAK,EAAE,IAAI;IACX,MAAM,EAAE,KAAK;IACb,MAAM,EAAE,KAAK;IACb,eAAe,EAAE,KAAK;IACtB,MAAM,EAAE,KAAK;IACb,QAAQ,EAAE,KAAK;CAChB,CAAC;AAEF,MAAM,CAAC,MAAM,YAAY,GAA8B;IACrD,KAAK,EAAE,MAAM;IACb,MAAM,EAAE,OAAO;CAChB,CAAC"}
