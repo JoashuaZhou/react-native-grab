@@ -50,6 +50,7 @@ const ITEM_NO_RE = /^\d+$/;
 export type RunnerControl = {
   readonly busy: boolean;
   readonly blocked: boolean;
+  runExclusive<T>(fn: () => Promise<T>): Promise<T>;
   kick(): void;
   unblock(): void;
   stop(): void;
@@ -133,14 +134,14 @@ const readJsonBody = (
   limit: number,
   onSuccess: (payload: JsonObject) => void,
 ): void => {
-  let body = "";
+  const chunks: Buffer[] = [];
   let byteLength = 0;
   let resolved = false;
 
   req.on("data", (chunk: Buffer | string) => {
     if (resolved) return;
-    const asString = chunk.toString();
-    byteLength += Buffer.byteLength(asString);
+    const asBuffer = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+    byteLength += asBuffer.length;
 
     if (byteLength > limit) {
       resolved = true;
@@ -156,13 +157,13 @@ const readJsonBody = (
       return;
     }
 
-    body += asString;
+    chunks.push(asBuffer);
   });
 
   req.on("end", () => {
     if (resolved) return;
     resolved = true;
-    const payload = parseJsonObject(body);
+    const payload = parseJsonObject(Buffer.concat(chunks).toString("utf8"));
     if (payload === null) {
       sendError(res, "invalid_input");
       return;
@@ -507,10 +508,6 @@ export const createReviewHandler = (deps: ReviewHandlerDeps) => {
   };
 
   const handleRevert = (res: ServerResponse, no: number): void => {
-    if (runner.busy) {
-      sendError(res, "runner_busy");
-      return;
-    }
     const review = store.get();
     const item = findItem(review, no);
     if (item === null) {
@@ -519,26 +516,21 @@ export const createReviewHandler = (deps: ReviewHandlerDeps) => {
     }
     markReverted(review, no, null);
     const shas = itemCommits(item);
-    void git
-      .revertCommits(review.worktree, shas, revertCommitMessage(no))
-      .then((result) => {
+    void runner
+      .runExclusive(async (): Promise<ReviewItem> => {
+        const result = await git.revertCommits(review.worktree, shas, revertCommitMessage(no));
         if (!result.ok) {
-          sendError(res, "conflict");
-          return;
+          throw new ReviewError("conflict", "撤销走查修改失败");
         }
         const commit = result.commit;
-        runGuarded(res, () => {
-          const updated = store.update((current) => markReverted(current, no, commit));
-          const updatedItem = findItem(updated, no);
-          if (updatedItem === null) {
-            sendError(res, "not_found");
-            return;
-          }
-          sendJson(res, 200, { ok: true, item: deviceItemView(updatedItem, runner.busy) });
-        });
+        const updated = store.update((current) => markReverted(current, no, commit));
+        return updated.items.find((candidate) => candidate.no === no) ?? item;
       })
-      .catch(() => {
-        sendJson(res, 500, { ok: false, error: "internal" });
+      .then((finishedItem) => {
+        sendJson(res, 200, { ok: true, item: deviceItemView(finishedItem, runner.busy) });
+      })
+      .catch((error: unknown) => {
+        sendReviewError(res, error);
       });
   };
 

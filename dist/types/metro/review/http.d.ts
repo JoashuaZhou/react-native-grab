@@ -6,6 +6,7 @@ export declare const REVIEW_CODE_HEADER = "x-rn-grab-review-code";
 export type RunnerControl = {
     readonly busy: boolean;
     readonly blocked: boolean;
+    runExclusive<T>(fn: () => Promise<T>): Promise<T>;
     kick(): void;
     unblock(): void;
     stop(): void;

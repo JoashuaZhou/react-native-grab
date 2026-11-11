@@ -73,14 +73,14 @@ const parseJsonObject = (value) => {
     return parsed;
 };
 const readJsonBody = (req, res, limit, onSuccess) => {
-    let body = "";
+    const chunks = [];
     let byteLength = 0;
     let resolved = false;
     req.on("data", (chunk) => {
         if (resolved)
             return;
-        const asString = chunk.toString();
-        byteLength += Buffer.byteLength(asString);
+        const asBuffer = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+        byteLength += asBuffer.length;
         if (byteLength > limit) {
             resolved = true;
             sendJson(res, 413, { ok: false, error: "payload_too_large" });
@@ -94,13 +94,13 @@ const readJsonBody = (req, res, limit, onSuccess) => {
             req.once("close", clearTimer);
             return;
         }
-        body += asString;
+        chunks.push(asBuffer);
     });
     req.on("end", () => {
         if (resolved)
             return;
         resolved = true;
-        const payload = parseJsonObject(body);
+        const payload = parseJsonObject(Buffer.concat(chunks).toString("utf8"));
         if (payload === null) {
             sendError(res, "invalid_input");
             return;
@@ -418,10 +418,6 @@ const createReviewHandler = (deps) => {
         });
     };
     const handleRevert = (res, no) => {
-        if (runner.busy) {
-            sendError(res, "runner_busy");
-            return;
-        }
         const review = store.get();
         const item = findItem(review, no);
         if (item === null) {
@@ -430,26 +426,21 @@ const createReviewHandler = (deps) => {
         }
         (0, transitions_1.markReverted)(review, no, null);
         const shas = (0, transitions_1.itemCommits)(item);
-        void git
-            .revertCommits(review.worktree, shas, (0, git_1.revertCommitMessage)(no))
-            .then((result) => {
+        void runner
+            .runExclusive(async () => {
+            const result = await git.revertCommits(review.worktree, shas, (0, git_1.revertCommitMessage)(no));
             if (!result.ok) {
-                sendError(res, "conflict");
-                return;
+                throw new transitions_1.ReviewError("conflict", "撤销走查修改失败");
             }
             const commit = result.commit;
-            runGuarded(res, () => {
-                const updated = store.update((current) => (0, transitions_1.markReverted)(current, no, commit));
-                const updatedItem = findItem(updated, no);
-                if (updatedItem === null) {
-                    sendError(res, "not_found");
-                    return;
-                }
-                sendJson(res, 200, { ok: true, item: deviceItemView(updatedItem, runner.busy) });
-            });
+            const updated = store.update((current) => (0, transitions_1.markReverted)(current, no, commit));
+            return updated.items.find((candidate) => candidate.no === no) ?? item;
         })
-            .catch(() => {
-            sendJson(res, 500, { ok: false, error: "internal" });
+            .then((finishedItem) => {
+            sendJson(res, 200, { ok: true, item: deviceItemView(finishedItem, runner.busy) });
+        })
+            .catch((error) => {
+            sendReviewError(res, error);
         });
     };
     const handleFinish = (res) => {

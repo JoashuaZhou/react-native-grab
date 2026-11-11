@@ -1,10 +1,10 @@
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NOW, awaiting, draftWithCommits, fixing, freshDraft, makeReview, passed, queued, } from "../../../review-core/__tests__/fixtures";
-import { attachScreenshot, beginFinish, createItem } from "../../../review-core/transitions";
+import { ReviewError, attachScreenshot, beginFinish, createItem, } from "../../../review-core/transitions";
 import { REVIEW_CODE_HEADER, REVIEW_ROUTE_PREFIX, createReviewHandler } from "../http";
 import { ReviewStore } from "../store";
 const PAIRING_CODE = "012345";
@@ -18,13 +18,32 @@ const makeGit = () => ({
         commit: "dead00",
     })),
 });
-const makeRunner = () => ({
-    busy: false,
-    blocked: false,
-    kick: vi.fn(() => { }),
-    unblock: vi.fn(() => { }),
-    stop: vi.fn(() => { }),
-});
+const makeRunner = (options) => {
+    const runner = {
+        busy: false,
+        blocked: false,
+        kick: vi.fn(() => { }),
+        unblock: vi.fn(() => { }),
+        stop: vi.fn(() => { }),
+        exclusiveRuns: 0,
+        async runExclusive(fn) {
+            if (runner.busy) {
+                throw new ReviewError("runner_busy", "走查执行器忙");
+            }
+            runner.busy = true;
+            try {
+                runner.exclusiveRuns += 1;
+                return await fn();
+            }
+            finally {
+                runner.busy = false;
+                options?.beforeKick?.();
+                runner.kick();
+            }
+        },
+    };
+    return runner;
+};
 let root;
 const servers = [];
 beforeEach(() => {
@@ -38,7 +57,7 @@ afterEach(async () => {
 const setup = async (review, options) => {
     const store = ReviewStore.create(mkdtempSync(join(root, "review-")), review);
     const git = makeGit();
-    const runner = makeRunner();
+    const runner = makeRunner({ beforeKick: options?.beforeKick });
     const handler = createReviewHandler({
         store,
         git,
@@ -71,6 +90,29 @@ const send = (base, method, path, body, headers) => request(base, path, {
 const post = (base, path, body, headers) => send(base, "POST", path, body, headers);
 const patch = (base, path, body, headers) => send(base, "PATCH", path, body, headers);
 const del = (base, path, headers) => request(base, path, { method: "DELETE", headers: { ...headers } });
+const postSplitBody = (base, path, headers, chunks, delayMs) => new Promise((resolve, reject) => {
+    const req = httpRequest(`${base}${path}`, { method: "POST", headers }, (message) => {
+        const parts = [];
+        message.on("data", (chunk) => {
+            parts.push(chunk);
+        });
+        message.on("end", () => {
+            resolve({
+                status: message.statusCode ?? 0,
+                body: Buffer.concat(parts).toString("utf8"),
+            });
+        });
+        message.on("error", reject);
+    });
+    req.on("error", reject);
+    req.write(chunks[0]);
+    setTimeout(() => {
+        for (const chunk of chunks.slice(1)) {
+            req.write(chunk);
+        }
+        req.end();
+    }, delayMs);
+});
 describe("pairing and gatekeeping", () => {
     it("pairs with the correct code and returns the device review view", async () => {
         const s = await setup(freshDraft());
@@ -282,6 +324,20 @@ describe("device item routes", () => {
         expect((await json(res)).error).toBe("has_commits");
         expect(s.store.get().items).toHaveLength(1);
     });
+    it("creates an item when a Chinese character is split across body chunks", async () => {
+        const s = await setup(makeReview());
+        const description = "标题字号应为 16";
+        const payload = JSON.stringify({ kind: "element", description });
+        const bytes = Buffer.from(payload, "utf8");
+        const charStart = Buffer.byteLength(payload.slice(0, payload.indexOf(description)), "utf8");
+        const split = charStart + 1;
+        const res = await postSplitBody(s.baseUrl, `${REVIEW_ROUTE_PREFIX}items`, { "content-type": "application/json", ...auth }, [bytes.subarray(0, split), bytes.subarray(split)], 50);
+        expect(res.status).toBe(201);
+        const body = JSON.parse(res.body);
+        const item = body.item.rounds;
+        expect(item[0].description).toBe(description);
+        expect(s.store.get().items[0].rounds[0].description).toBe(description);
+    });
     it("rejects malformed item numbers with 400", async () => {
         const s = await setup(freshDraft());
         const device = await patch(s.baseUrl, `${REVIEW_ROUTE_PREFIX}items/abc`, { description: "x" }, auth);
@@ -388,14 +444,16 @@ describe("screenshots", () => {
     });
 });
 describe("revert", () => {
-    it("refuses to revert while the runner is busy", async () => {
+    it("rejects the exclusive section while the runner is busy without running it", async () => {
         const s = await setup(awaiting());
         s.runner.busy = true;
         const res = await post(s.baseUrl, `${REVIEW_ROUTE_PREFIX}items/1/revert`, {}, auth);
         expect(res.status).toBe(409);
         expect((await json(res)).error).toBe("runner_busy");
+        expect(s.runner.exclusiveRuns).toBe(0);
         expect(s.git.revertCommits).not.toHaveBeenCalled();
         expect(s.store.get().items[0].status).toBe("awaiting_review");
+        expect(s.runner.kick).not.toHaveBeenCalled();
     });
     it("maps git conflicts to 409 and keeps the item awaiting review", async () => {
         const s = await setup(awaiting());
@@ -404,23 +462,41 @@ describe("revert", () => {
         expect(res.status).toBe(409);
         expect((await json(res)).error).toBe("conflict");
         expect(s.store.get().items[0].status).toBe("awaiting_review");
-        expect(s.runner.kick).not.toHaveBeenCalled();
+        expect(s.runner.kick).toHaveBeenCalledTimes(1);
     });
-    it("reverts the stored commits and marks the item reverted without kicking", async () => {
-        const s = await setup(awaiting());
+    it("reverts inside the exclusive section and persists before the release kick", async () => {
+        let s;
+        const snapshot = { captured: null };
+        let busyDuringGit = false;
+        s = await setup(awaiting(), {
+            beforeKick: () => {
+                snapshot.captured = s.store.get();
+            },
+        });
+        s.git.revertCommits.mockImplementationOnce(async () => {
+            busyDuringGit = s.runner.busy;
+            return { ok: true, commit: "dead00" };
+        });
         const res = await post(s.baseUrl, `${REVIEW_ROUTE_PREFIX}items/1/revert`, {}, auth);
         expect(res.status).toBe(200);
         const body = await json(res);
         expect(body.item).toMatchObject({ no: 1, status: "reverted", revertCommit: "dead00" });
         expect(s.git.revertCommits).toHaveBeenCalledWith(WORKTREE, ["abc"], REVERT_MESSAGE);
-        expect(s.runner.kick).not.toHaveBeenCalled();
+        expect(busyDuringGit).toBe(true);
+        expect(s.runner.exclusiveRuns).toBe(1);
+        const captured = snapshot.captured;
+        expect(captured).not.toBeNull();
+        expect(captured.items[0].status).toBe("reverted");
+        expect(captured.revertedSinceLastRun).toEqual([1]);
         expect(s.store.get().revertedSinceLastRun).toEqual([1]);
+        expect(s.runner.kick).toHaveBeenCalledTimes(1);
     });
     it("refuses to revert a fresh draft without commits", async () => {
         const s = await setup(freshDraft());
         const res = await post(s.baseUrl, `${REVIEW_ROUTE_PREFIX}items/1/revert`, {}, auth);
         expect(res.status).toBe(409);
         expect((await json(res)).error).toBe("invalid_state");
+        expect(s.runner.exclusiveRuns).toBe(0);
         expect(s.git.revertCommits).not.toHaveBeenCalled();
     });
 });
