@@ -65,6 +65,14 @@ const now = new Date("2026-11-11T08:00:00Z");
         const reclaimed = (0, transitions_1.claimItem)(released, 1);
         (0, vitest_1.expect)(reclaimed.items[0]).toMatchObject({ status: "fixing", lastError: null });
     });
+    (0, vitest_1.it)("agent mutations throw review_closed once the review is abandoned", () => {
+        const stoppedAfterQueue = (0, transitions_1.abandonReview)((0, fixtures_1.queued)());
+        (0, vitest_1.expect)(stoppedAfterQueue.items[0].status).toBe("queued");
+        (0, vitest_1.expect)(() => (0, transitions_1.claimItem)(stoppedAfterQueue, 1)).toThrow(vitest_1.expect.objectContaining({ code: "review_closed" }));
+        const stoppedMidFix = (0, transitions_1.abandonReview)((0, fixtures_1.fixing)());
+        (0, vitest_1.expect)(stoppedMidFix.items[0].status).toBe("fixing");
+        (0, vitest_1.expect)(() => (0, transitions_1.replyItem)(stoppedMidFix, 1, "已改为 16", ["abc"], now)).toThrow(vitest_1.expect.objectContaining({ code: "review_closed" }));
+    });
     (0, vitest_1.it)("rejects blank description or supplement with empty_text", () => {
         (0, vitest_1.expect)(() => (0, transitions_1.createItem)((0, fixtures_1.makeReview)(), { kind: "element", description: "   " }, now)).toThrow(vitest_1.expect.objectContaining({ code: "empty_text" }));
         (0, vitest_1.expect)(() => (0, transitions_1.rejectItem)((0, fixtures_1.awaiting)(), 1, "", now)).toThrow(vitest_1.expect.objectContaining({ code: "empty_text" }));

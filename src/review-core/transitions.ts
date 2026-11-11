@@ -206,6 +206,7 @@ export function submitDrafts(review: Review, now: Date): { review: Review; submi
 }
 
 export function claimItem(review: Review, no: number): Review {
+  requireActive(review);
   const item = requireItem(review, no);
   if (item.status !== "queued") {
     fail("invalid_state", "仅待修复的条目可以认领");
@@ -220,6 +221,7 @@ export function replyItem(
   commits: string[],
   now: Date,
 ): Review {
+  requireActive(review);
   const item = requireItem(review, no);
   if (item.status !== "fixing") {
     fail("invalid_state", "仅修复中的条目可以回复");

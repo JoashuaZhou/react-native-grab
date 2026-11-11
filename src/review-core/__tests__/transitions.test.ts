@@ -113,6 +113,19 @@ describe("design-review state machine", () => {
     expect(reclaimed.items[0]).toMatchObject({ status: "fixing", lastError: null });
   });
 
+  it("agent mutations throw review_closed once the review is abandoned", () => {
+    const stoppedAfterQueue = abandonReview(queued());
+    expect(stoppedAfterQueue.items[0].status).toBe("queued");
+    expect(() => claimItem(stoppedAfterQueue, 1)).toThrow(
+      expect.objectContaining({ code: "review_closed" }),
+    );
+    const stoppedMidFix = abandonReview(fixing());
+    expect(stoppedMidFix.items[0].status).toBe("fixing");
+    expect(() => replyItem(stoppedMidFix, 1, "已改为 16", ["abc"], now)).toThrow(
+      expect.objectContaining({ code: "review_closed" }),
+    );
+  });
+
   it("rejects blank description or supplement with empty_text", () => {
     expect(() => createItem(makeReview(), { kind: "element", description: "   " }, now)).toThrow(
       expect.objectContaining({ code: "empty_text" }),
