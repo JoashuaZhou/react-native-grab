@@ -135,19 +135,41 @@ type ReviewModule = ReturnType<typeof createReviewModule>;
 
 let cachedReviewModule: ReviewModule | null = null;
 let cachedReviewModuleDir: string | null = null;
+let reviewErrorPrintedDir: string | null = null;
+
+const loadReviewModule = (dir: string): { module: ReviewModule | null; error: unknown } => {
+  try {
+    const module = createReviewModule(dir);
+    cachedReviewModule = module;
+    cachedReviewModuleDir = dir;
+    return { module, error: null };
+  } catch (error) {
+    cachedReviewModule = null;
+    cachedReviewModuleDir = null;
+    return { module: null, error };
+  }
+};
 
 const resolveReviewModule = (dir: string): ReviewModule | null => {
   if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
     return cachedReviewModule;
   }
-  try {
-    cachedReviewModule = createReviewModule(dir);
-    cachedReviewModuleDir = dir;
-    return cachedReviewModule;
-  } catch {
-    cachedReviewModule = null;
-    cachedReviewModuleDir = null;
-    return null;
+  return loadReviewModule(dir).module;
+};
+
+const initializeReviewModule = (): void => {
+  const dir = process.env[REVIEW_DIR_ENV];
+  if (dir === undefined || dir === "") {
+    return;
+  }
+  if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
+    return;
+  }
+  const { module, error } = loadReviewModule(dir);
+  if (module === null && reviewErrorPrintedDir !== dir) {
+    reviewErrorPrintedDir = dir;
+    const cause = error instanceof Error ? error.message : String(error);
+    console.error(`react-native-grab: 无法加载设计走查目录 ${dir}：${cause}`);
   }
 };
 
@@ -199,6 +221,8 @@ export const withReactNativeGrab = createMetroConfigTransformer(
           const baseMiddleware = previousEnhanceMiddleware
             ? previousEnhanceMiddleware(middleware, metroServer)
             : middleware;
+
+          initializeReviewModule();
 
           return (req, res, next) => {
             handleReactNativeGrabRequest(req, res, () => {

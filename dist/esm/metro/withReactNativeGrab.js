@@ -104,19 +104,39 @@ const handleCopyRequest = (req, res) => {
 };
 let cachedReviewModule = null;
 let cachedReviewModuleDir = null;
+let reviewErrorPrintedDir = null;
+const loadReviewModule = (dir) => {
+    try {
+        const module = createReviewModule(dir);
+        cachedReviewModule = module;
+        cachedReviewModuleDir = dir;
+        return { module, error: null };
+    }
+    catch (error) {
+        cachedReviewModule = null;
+        cachedReviewModuleDir = null;
+        return { module: null, error };
+    }
+};
 const resolveReviewModule = (dir) => {
     if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
         return cachedReviewModule;
     }
-    try {
-        cachedReviewModule = createReviewModule(dir);
-        cachedReviewModuleDir = dir;
-        return cachedReviewModule;
+    return loadReviewModule(dir).module;
+};
+const initializeReviewModule = () => {
+    const dir = process.env[REVIEW_DIR_ENV];
+    if (dir === undefined || dir === "") {
+        return;
     }
-    catch {
-        cachedReviewModule = null;
-        cachedReviewModuleDir = null;
-        return null;
+    if (cachedReviewModule !== null && cachedReviewModuleDir === dir) {
+        return;
+    }
+    const { module, error } = loadReviewModule(dir);
+    if (module === null && reviewErrorPrintedDir !== dir) {
+        reviewErrorPrintedDir = dir;
+        const cause = error instanceof Error ? error.message : String(error);
+        console.error(`react-native-grab: 无法加载设计走查目录 ${dir}：${cause}`);
     }
 };
 const handleReactNativeGrabRequest = (req, res, next) => {
@@ -151,6 +171,7 @@ export const withReactNativeGrab = createMetroConfigTransformer((config) => {
                 const baseMiddleware = previousEnhanceMiddleware
                     ? previousEnhanceMiddleware(middleware, metroServer)
                     : middleware;
+                initializeReviewModule();
                 return (req, res, next) => {
                     handleReactNativeGrabRequest(req, res, () => {
                         baseMiddleware(req, res, next);

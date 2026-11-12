@@ -71,8 +71,11 @@ export const createAgentLock = (lockFile) => ({
         return isPidAlive(pid) ? pid : null;
     },
 });
-const itemStatus = (review, no) => {
-    return review.items.find((item) => item.no === no)?.status ?? null;
+const repliedRoundCount = (review, no) => {
+    const item = review.items.find((candidate) => candidate.no === no);
+    if (item === undefined)
+        return 0;
+    return item.rounds.filter((round) => round.reply !== null).length;
 };
 export class AgentRunner {
     constructor(deps) {
@@ -139,6 +142,14 @@ export class AgentRunner {
             resolve();
         }
     }
+    safeLog(line) {
+        try {
+            this.log(line);
+        }
+        catch {
+            return;
+        }
+    }
     async drain() {
         if (this.draining)
             return;
@@ -151,7 +162,7 @@ export class AgentRunner {
             }
         }
         catch (error) {
-            this.log(`agent 调度异常：${String(error)}`);
+            this.safeLog(`agent 调度异常：${String(error)}`);
         }
         finally {
             this.draining = false;
@@ -162,8 +173,7 @@ export class AgentRunner {
         if (this.stopped || this.blockedState || this.busy) {
             return;
         }
-        const work = nextWork(this.store.get());
-        if (work === null) {
+        if (nextWork(this.store.get()) === null) {
             return;
         }
         this.running = true;
@@ -175,7 +185,7 @@ export class AgentRunner {
                     break;
                 waitedForOrphan = true;
                 this.waitingOrphan = true;
-                this.log(`等待上一次 agent 进程 ${live} 退出`);
+                this.safeLog(`等待上一次 agent 进程 ${live} 退出`);
                 await sleep(this.orphanPollMs);
             }
             this.waitingOrphan = false;
@@ -185,6 +195,10 @@ export class AgentRunner {
             this.lock.clear();
             if (waitedForOrphan) {
                 this.store.update((review) => releaseFixing(review, RESTART_RELEASE_MESSAGE));
+            }
+            const work = nextWork(this.store.get());
+            if (work === null) {
+                return;
             }
             if (work.kind === "finish") {
                 const review = this.store.get();
@@ -199,8 +213,11 @@ export class AgentRunner {
                     return;
                 }
             }
-            const message = buildAgentMessage(work, this.store.get());
-            this.log(work.kind === "fix"
+            const before = this.store.get();
+            const announcedItems = work.kind === "fix" ? work.items : [];
+            const repliedBefore = announcedItems.map((no) => repliedRoundCount(before, no));
+            const message = buildAgentMessage(work, before);
+            this.safeLog(work.kind === "fix"
                 ? `启动 agent 处理条目 ${formatNumbers(work.items)}`
                 : "启动 agent 收尾");
             let exitCode;
@@ -209,31 +226,38 @@ export class AgentRunner {
                 exitCode = result.exitCode;
             }
             catch (error) {
-                this.log(`agent 运行异常退出：${String(error)}`);
+                this.safeLog(`agent 运行异常退出：${String(error)}`);
                 exitCode = -1;
             }
             finally {
                 this.lock.clear();
             }
-            const after = this.store.update((review) => ({
-                ...releaseFixing(review, RUN_END_RELEASE_MESSAGE),
-                revertedSinceLastRun: [],
-            }));
-            const progressed = work.kind === "fix"
-                ? exitCode === 0 &&
-                    work.items.every((no) => {
-                        const status = itemStatus(after, no);
-                        return status !== "queued" && status !== "fixing";
-                    })
-                : exitCode === 0 && after.status === "done";
+            const after = this.store.get();
+            let newlyRepliedCount = 0;
+            for (let i = 0; i < announcedItems.length; i++) {
+                if (repliedRoundCount(after, announcedItems[i]) > repliedBefore[i]) {
+                    newlyRepliedCount += 1;
+                }
+            }
+            const progressed = work.kind === "fix" ? newlyRepliedCount > 0 : after.status === "done";
+            this.safeLog(`agent 运行结束：exitCode=${exitCode}，新增回复条目=${newlyRepliedCount}`);
+            const announcedReverted = work.kind === "fix" ? work.reverted : [];
+            this.store.update((review) => {
+                const released = releaseFixing(review, RUN_END_RELEASE_MESSAGE);
+                const revertedSinceLastRun = progressed
+                    ? released.revertedSinceLastRun.filter((no) => !announcedReverted.includes(no))
+                    : released.revertedSinceLastRun;
+                return { ...released, revertedSinceLastRun };
+            });
             if (progressed) {
                 this.noProgressStreak = 0;
+                this.kick();
                 return;
             }
             this.noProgressStreak += 1;
             if (this.noProgressStreak >= NO_PROGRESS_LIMIT) {
                 this.blockedState = true;
-                this.log("agent 连续两次运行没有进展，已暂停，等待手动重试");
+                this.safeLog("agent 连续两次运行没有进展，已暂停，等待手动重试");
                 return;
             }
             this.kick();

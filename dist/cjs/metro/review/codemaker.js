@@ -57,14 +57,29 @@ const spawnCodemaker = (bin, args, logFile, onPid) => {
         }
         child.stdout?.on("data", (chunk) => {
             stdoutChunks.push(chunk);
-            (0, node_fs_1.appendFileSync)(logFile, chunk);
+            try {
+                (0, node_fs_1.appendFileSync)(logFile, chunk);
+            }
+            catch {
+                return;
+            }
         });
         child.stderr?.on("data", (chunk) => {
-            (0, node_fs_1.appendFileSync)(logFile, chunk);
+            try {
+                (0, node_fs_1.appendFileSync)(logFile, chunk);
+            }
+            catch {
+                return;
+            }
         });
         child.on("error", (error) => {
-            (0, node_fs_1.appendFileSync)(logFile, `${String(error)}\n`, "utf8");
             settle(-1);
+            try {
+                (0, node_fs_1.appendFileSync)(logFile, `${String(error)}\n`, "utf8");
+            }
+            catch {
+                return;
+            }
         });
         child.on("close", (code) => {
             settle(code ?? -1);

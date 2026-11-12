@@ -93,4 +93,16 @@ let root;
         (0, vitest_1.expect)((0, node_fs_1.readFileSync)(logFile, "utf8").length).toBeGreaterThan(0);
     });
 });
+(0, vitest_1.describe)("spawnCodemaker log failures", () => {
+    (0, vitest_1.it)("resolves a successful run even when the log file is unwritable", async () => {
+        const result = await (0, codemaker_1.spawnCodemaker)(process.execPath, ["-e", "console.log('out-line'); console.error('err-line');"], (0, node_path_1.join)(root, "missing-dir", "agent.log"), () => { });
+        (0, vitest_1.expect)(result.exitCode).toBe(0);
+        (0, vitest_1.expect)(result.stdout).toContain("out-line");
+    });
+    (0, vitest_1.it)("resolves a missing bin with -1 even when the log file is unwritable", async () => {
+        const result = await (0, codemaker_1.spawnCodemaker)((0, node_path_1.join)(root, "missing-bin"), ["--version"], (0, node_path_1.join)(root, "missing-dir", "agent.log"), () => { });
+        (0, vitest_1.expect)(result.exitCode).toBe(-1);
+        (0, vitest_1.expect)(result.stdout).toBe("");
+    });
+});
 //# sourceMappingURL=codemaker.test.js.map

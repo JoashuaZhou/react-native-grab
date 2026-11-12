@@ -91,4 +91,16 @@ describe("spawnCodemaker", () => {
         expect(readFileSync(logFile, "utf8").length).toBeGreaterThan(0);
     });
 });
+describe("spawnCodemaker log failures", () => {
+    it("resolves a successful run even when the log file is unwritable", async () => {
+        const result = await spawnCodemaker(process.execPath, ["-e", "console.log('out-line'); console.error('err-line');"], join(root, "missing-dir", "agent.log"), () => { });
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain("out-line");
+    });
+    it("resolves a missing bin with -1 even when the log file is unwritable", async () => {
+        const result = await spawnCodemaker(join(root, "missing-bin"), ["--version"], join(root, "missing-dir", "agent.log"), () => { });
+        expect(result.exitCode).toBe(-1);
+        expect(result.stdout).toBe("");
+    });
+});
 //# sourceMappingURL=codemaker.test.js.map

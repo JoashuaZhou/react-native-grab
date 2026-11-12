@@ -66,18 +66,29 @@ export const spawnCodemaker = (
 
     child.stdout?.on("data", (chunk: Buffer) => {
       stdoutChunks.push(chunk);
-      appendFileSync(logFile, chunk);
+      try {
+        appendFileSync(logFile, chunk);
+      } catch {
+        return;
+      }
     });
 
     child.stderr?.on("data", (chunk: Buffer) => {
-      appendFileSync(logFile, chunk);
+      try {
+        appendFileSync(logFile, chunk);
+      } catch {
+        return;
+      }
     });
 
     child.on("error", (error: Error) => {
-      appendFileSync(logFile, `${String(error)}\n`, "utf8");
       settle(-1);
+      try {
+        appendFileSync(logFile, `${String(error)}\n`, "utf8");
+      } catch {
+        return;
+      }
     });
-
     child.on("close", (code: number | null) => {
       settle(code ?? -1);
     });

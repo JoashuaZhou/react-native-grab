@@ -55,6 +55,7 @@ export declare class AgentRunner implements RunnerControl {
     runExclusive<T>(fn: () => Promise<T>): Promise<T>;
     whenIdle(): Promise<void>;
     private notifyIdle;
+    private safeLog;
     private drain;
     private tryRun;
 }

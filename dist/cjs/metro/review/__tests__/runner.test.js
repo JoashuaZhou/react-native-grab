@@ -33,10 +33,52 @@ const setupRunner = (review, makeRun, options) => {
             clear: vitest_1.vi.fn(),
             livePid: options?.livePid ?? (() => null),
         },
-        log: vitest_1.vi.fn(),
+        log: options?.log ?? vitest_1.vi.fn(),
     });
     runner = created;
     return { store, runner: created };
+};
+const replyAllOpen = (store) => {
+    const open = store
+        .get()
+        .items.filter((item) => item.status === "queued" || item.status === "fixing")
+        .map((item) => item.no);
+    for (const no of open) {
+        store.update((review) => (0, transitions_1.replyItem)((0, transitions_1.claimItem)(review, no), no, "已修复", [`sha${no}`], fixtures_1.LATER));
+    }
+};
+const queuedItems = (count) => {
+    let review = (0, fixtures_1.makeReview)();
+    for (let i = 0; i < count; i++) {
+        review = (0, transitions_1.createItem)(review, { ...(0, fixtures_1.makeItemInput)() }, fixtures_1.NOW).review;
+    }
+    return (0, transitions_1.submitDrafts)(review, fixtures_1.LATER).review;
+};
+const twoOpenItems = () => {
+    return (0, transitions_1.claimItem)(queuedItems(2), 1);
+};
+const revertedAndOpen = () => {
+    let review = queuedItems(3);
+    review = (0, transitions_1.replyItem)((0, transitions_1.claimItem)(review, 1), 1, "已修复", ["sha1"], fixtures_1.LATER);
+    review = (0, transitions_1.replyItem)((0, transitions_1.claimItem)(review, 3), 3, "已修复", ["sha3"], fixtures_1.LATER);
+    return (0, transitions_1.markReverted)(review, 1, null);
+};
+const waitForCondition = async (check, timeoutMs = 4000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        if (check())
+            return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error("condition not met in time");
+};
+const readLog = (dir) => {
+    try {
+        return (0, node_fs_1.readFileSync)((0, node_path_1.join)(dir, "agent.log"), "utf8");
+    }
+    catch {
+        return "";
+    }
 };
 const fixItems = (store, ...nos) => {
     for (const no of nos) {
@@ -318,6 +360,162 @@ const readStoredReview = (dir) => JSON.parse((0, node_fs_1.readFileSync)((0, nod
         (0, vitest_1.expect)(messages).toHaveLength(1);
     });
 });
+(0, vitest_1.describe)("AgentRunner replied-round progress", () => {
+    (0, vitest_1.it)("ends after four runs when the agent replies only to the first announced item per run", async () => {
+        const messages = [];
+        const { store, runner } = setupRunner(queuedItems(4), ({ store }) => async (message) => {
+            messages.push(message);
+            const open = store
+                .get()
+                .items.filter((item) => item.status === "queued" || item.status === "fixing")
+                .map((item) => item.no);
+            if (open.length > 0) {
+                const no = open[0];
+                store.update((review) => (0, transitions_1.replyItem)((0, transitions_1.claimItem)(review, no), no, "已修复", [`sha${no}`], fixtures_1.LATER));
+            }
+            return { exitCode: 0 };
+        });
+        runner.kick();
+        await runner.whenIdle();
+        (0, vitest_1.expect)(messages).toHaveLength(4);
+        (0, vitest_1.expect)(messages[3]).toContain("#4");
+        (0, vitest_1.expect)(messages[3]).not.toContain("#1");
+        (0, vitest_1.expect)(store.get().items.every((item) => item.status === "awaiting_review")).toBe(true);
+        (0, vitest_1.expect)(runner.blocked).toBe(false);
+        (0, vitest_1.expect)(runner.busy).toBe(false);
+    });
+    (0, vitest_1.it)("counts a reply-then-reject-resubmit cycle within one run as progress and reprocesses the item", async () => {
+        const messages = [];
+        const { store, runner } = setupRunner((0, fixtures_1.queued)(), ({ store }) => async (message) => {
+            messages.push(message);
+            store.update((review) => (0, transitions_1.replyItem)((0, transitions_1.claimItem)(review, 1), 1, "已修复", [`sha-${messages.length}`], fixtures_1.LATER));
+            if (messages.length <= 2) {
+                store.update((review) => (0, transitions_1.submitDrafts)((0, transitions_1.rejectItem)(review, 1, "间距仍不对", fixtures_1.LATER), fixtures_1.LATER).review);
+            }
+            return { exitCode: 0 };
+        });
+        runner.kick();
+        await runner.whenIdle();
+        (0, vitest_1.expect)(messages).toHaveLength(3);
+        (0, vitest_1.expect)(messages[1]).toContain("#1");
+        (0, vitest_1.expect)(messages[2]).toContain("#1");
+        const item = store.get().items[0];
+        (0, vitest_1.expect)(item.status).toBe("awaiting_review");
+        (0, vitest_1.expect)(item.rounds).toHaveLength(3);
+        (0, vitest_1.expect)(runner.blocked).toBe(false);
+    });
+    (0, vitest_1.it)("treats a nonzero exit code with a newly added reply as progress and logs the run summary", async () => {
+        const logLines = [];
+        const messages = [];
+        const { store, runner } = setupRunner((0, fixtures_1.queued)(), ({ store }) => async (message) => {
+            messages.push(message);
+            replyAllOpen(store);
+            return { exitCode: 1 };
+        }, { log: (line) => logLines.push(line) });
+        runner.kick();
+        await runner.whenIdle();
+        const summary = logLines.find((line) => line.includes("exitCode=1"));
+        (0, vitest_1.expect)(summary).toBeDefined();
+        (0, vitest_1.expect)(summary).toContain("新增回复条目=1");
+        (0, vitest_1.expect)(store.get().items[0].status).toBe("awaiting_review");
+        submitNewItem(store);
+        runner.kick();
+        await runner.whenIdle();
+        (0, vitest_1.expect)(messages).toHaveLength(2);
+        (0, vitest_1.expect)(store.get().items[1].status).toBe("awaiting_review");
+        (0, vitest_1.expect)(runner.blocked).toBe(false);
+    });
+    (0, vitest_1.it)("retains reverted numbers after no-progress runs and clears only announced numbers on progress", async () => {
+        const messages = [];
+        const { store, runner } = setupRunner(revertedAndOpen(), ({ store }) => async (message) => {
+            messages.push(message);
+            if (messages.length === 2) {
+                store.update((current) => (0, transitions_1.markReverted)(current, 3, null));
+                store.update((current) => (0, transitions_1.replyItem)((0, transitions_1.claimItem)(current, 2), 2, "已修复", ["sha2"], fixtures_1.LATER));
+            }
+            return { exitCode: 0 };
+        });
+        runner.kick();
+        await runner.whenIdle();
+        (0, vitest_1.expect)(messages).toHaveLength(2);
+        (0, vitest_1.expect)(messages[0]).toContain("#1");
+        (0, vitest_1.expect)(messages[0]).toContain("不要恢复");
+        (0, vitest_1.expect)(messages[1]).toContain("#1");
+        (0, vitest_1.expect)(messages[1]).toContain("不要恢复");
+        (0, vitest_1.expect)(messages[1]).toContain("#2");
+        (0, vitest_1.expect)(store.get().revertedSinceLastRun).toEqual([3]);
+        (0, vitest_1.expect)(runner.blocked).toBe(false);
+    });
+});
+(0, vitest_1.describe)("AgentRunner orphan wait recompute", () => {
+    (0, vitest_1.it)("omits items the orphan replied to from the message spawned after the wait", async () => {
+        vitest_1.vi.useFakeTimers();
+        try {
+            let livePid = 4242;
+            const messages = [];
+            const { store, runner } = setupRunner(twoOpenItems(), ({ store }) => async (message) => {
+                messages.push(message);
+                replyAllOpen(store);
+                return { exitCode: 0 };
+            }, { livePid: () => livePid });
+            runner.kick();
+            store.update((review) => (0, transitions_1.replyItem)(review, 1, "orphan 已修复", ["sha1"], fixtures_1.LATER));
+            livePid = null;
+            await vitest_1.vi.advanceTimersByTimeAsync(5000);
+            await runner.whenIdle();
+            (0, vitest_1.expect)(messages).toHaveLength(1);
+            (0, vitest_1.expect)(messages[0]).toContain("#2");
+            (0, vitest_1.expect)(messages[0]).not.toContain("#1");
+            (0, vitest_1.expect)(store.get().items.map((item) => item.status)).toEqual([
+                "awaiting_review",
+                "awaiting_review",
+            ]);
+        }
+        finally {
+            vitest_1.vi.useRealTimers();
+        }
+    });
+    (0, vitest_1.it)("does not spawn when no work remains after the orphan wait", async () => {
+        vitest_1.vi.useFakeTimers();
+        try {
+            let livePid = 4242;
+            const messages = [];
+            const { store, runner } = setupRunner((0, fixtures_1.fixing)(), () => async (message) => {
+                messages.push(message);
+                return { exitCode: 0 };
+            }, { livePid: () => livePid });
+            runner.kick();
+            store.update((review) => (0, transitions_1.replyItem)(review, 1, "orphan 已修复", ["sha1"], fixtures_1.LATER));
+            livePid = null;
+            await vitest_1.vi.advanceTimersByTimeAsync(5000);
+            await runner.whenIdle();
+            (0, vitest_1.expect)(messages).toHaveLength(0);
+            (0, vitest_1.expect)(runner.busy).toBe(false);
+            (0, vitest_1.expect)(store.get().items[0].status).toBe("awaiting_review");
+        }
+        finally {
+            vitest_1.vi.useRealTimers();
+        }
+    });
+});
+(0, vitest_1.describe)("AgentRunner log failure safety", () => {
+    (0, vitest_1.it)("keeps scheduling when the log callback throws and runs reject", async () => {
+        const messages = [];
+        const { store, runner } = setupRunner((0, fixtures_1.queued)(), () => async (message) => {
+            messages.push(message);
+            throw new Error("spawn failed");
+        }, {
+            log: () => {
+                throw new Error("log broken");
+            },
+        });
+        runner.kick();
+        await runner.whenIdle();
+        (0, vitest_1.expect)(messages).toHaveLength(2);
+        (0, vitest_1.expect)(runner.blocked).toBe(true);
+        (0, vitest_1.expect)(store.get().items[0].status).toBe("queued");
+    });
+});
 (0, vitest_1.describe)("createReviewModule", () => {
     (0, vitest_1.it)("releases fixing items on load when no live pid holds the lock and kicks", async () => {
         const dir = (0, node_fs_1.mkdtempSync)((0, node_path_1.join)(root, "module-"));
@@ -351,35 +549,46 @@ const readStoredReview = (dir) => JSON.parse((0, node_fs_1.readFileSync)((0, nod
             vitest_1.vi.useRealTimers();
         }
     });
-});
-(0, vitest_1.describe)("withReactNativeGrab review routing", () => {
-    const makeMiddleware = () => {
-        const base = vitest_1.vi.fn();
-        const transformed = (0, withReactNativeGrab_1.withReactNativeGrab)({});
-        const enhance = transformed.server?.enhanceMiddleware;
-        (0, vitest_1.expect)(enhance).toBeTypeOf("function");
-        const wrapped = enhance(base, {});
-        return { call: wrapped, base };
-    };
-    const makeReq = (url, headers = {}) => ({
-        url,
-        method: "GET",
-        headers,
-        socket: { remoteAddress: "127.0.0.1" },
+    (0, vitest_1.it)("keeps the module runner alive when agent.log cannot be written", async () => {
+        const dir = (0, node_fs_1.mkdtempSync)((0, node_path_1.join)(root, "module-log-"));
+        store_1.ReviewStore.create(dir, { ...(0, fixtures_1.fixing)(), codemakerBin: (0, node_path_1.join)(root, "no-such-bin") });
+        (0, node_fs_1.mkdirSync)((0, node_path_1.join)(dir, "agent.log"));
+        const reviewModule = (0, module_1.createReviewModule)(dir);
+        await reviewModule.runner.whenIdle();
+        (0, vitest_1.expect)(reviewModule.runner.blocked).toBe(true);
+        const stored = readStoredReview(dir);
+        (0, vitest_1.expect)(stored.items[0].status).toBe("queued");
+        (0, vitest_1.expect)(stored.items[0].lastError).toBe("Metro 重启时该条仍在修复中");
     });
-    const makeRes = () => {
-        let statusCode = 0;
-        let body = "";
-        const res = {
-            writeHead(code) {
-                statusCode = code;
-            },
-            end(data) {
-                body = data ?? "";
-            },
-        };
-        return { res, status: () => statusCode, body: () => body };
+});
+const makeMiddleware = () => {
+    const base = vitest_1.vi.fn();
+    const transformed = (0, withReactNativeGrab_1.withReactNativeGrab)({});
+    const enhance = transformed.server?.enhanceMiddleware;
+    (0, vitest_1.expect)(enhance).toBeTypeOf("function");
+    const wrapped = enhance(base, {});
+    return { call: wrapped, base };
+};
+const makeReq = (url, headers = {}) => ({
+    url,
+    method: "GET",
+    headers,
+    socket: { remoteAddress: "127.0.0.1" },
+});
+const makeRes = () => {
+    let statusCode = 0;
+    let body = "";
+    const res = {
+        writeHead(code) {
+            statusCode = code;
+        },
+        end(data) {
+            body = data ?? "";
+        },
     };
+    return { res, status: () => statusCode, body: () => body };
+};
+(0, vitest_1.describe)("withReactNativeGrab review routing", () => {
     (0, vitest_1.it)("answers 404 no_active_review for review routes without RN_GRAB_REVIEW_DIR", () => {
         delete process.env.RN_GRAB_REVIEW_DIR;
         const { call } = makeMiddleware();
@@ -403,11 +612,17 @@ const readStoredReview = (dir) => JSON.parse((0, node_fs_1.readFileSync)((0, nod
     });
     (0, vitest_1.it)("answers 500 internal when the review dir cannot be loaded", () => {
         process.env.RN_GRAB_REVIEW_DIR = (0, node_path_1.join)(root, "missing-");
-        const { call } = makeMiddleware();
-        const response = makeRes();
-        call(makeReq(`${http_1.REVIEW_ROUTE_PREFIX}state`), response.res, () => { });
-        (0, vitest_1.expect)(response.status()).toBe(500);
-        (0, vitest_1.expect)(JSON.parse(response.body())).toEqual({ ok: false, error: "internal" });
+        const errorSpy = vitest_1.vi.spyOn(console, "error").mockImplementation(() => { });
+        try {
+            const { call } = makeMiddleware();
+            const response = makeRes();
+            call(makeReq(`${http_1.REVIEW_ROUTE_PREFIX}state`), response.res, () => { });
+            (0, vitest_1.expect)(response.status()).toBe(500);
+            (0, vitest_1.expect)(JSON.parse(response.body())).toEqual({ ok: false, error: "internal" });
+        }
+        finally {
+            errorSpy.mockRestore();
+        }
     });
     (0, vitest_1.it)("passes non-review routes through to the base middleware", () => {
         const { call, base } = makeMiddleware();
@@ -416,6 +631,68 @@ const readStoredReview = (dir) => JSON.parse((0, node_fs_1.readFileSync)((0, nod
         call(makeReq("/some/metro/route"), response.res, next);
         (0, vitest_1.expect)(base).toHaveBeenCalledTimes(1);
         (0, vitest_1.expect)(next).not.toHaveBeenCalled();
+    });
+});
+(0, vitest_1.describe)("withReactNativeGrab eager module initialization", () => {
+    (0, vitest_1.it)("initializes the module in enhanceMiddleware and not during config evaluation", async () => {
+        const dir = (0, node_fs_1.mkdtempSync)((0, node_path_1.join)(root, "eager-"));
+        store_1.ReviewStore.create(dir, { ...(0, fixtures_1.fixing)(), codemakerBin: process.execPath });
+        process.env.RN_GRAB_REVIEW_DIR = dir;
+        const errorSpy = vitest_1.vi.spyOn(console, "error").mockImplementation(() => { });
+        try {
+            const transformed = (0, withReactNativeGrab_1.withReactNativeGrab)({});
+            const enhance = transformed.server?.enhanceMiddleware;
+            (0, vitest_1.expect)(enhance).toBeTypeOf("function");
+            (0, vitest_1.expect)(readStoredReview(dir).items[0].status).toBe("fixing");
+            (0, vitest_1.expect)(errorSpy).not.toHaveBeenCalled();
+            enhance(vitest_1.vi.fn(), {});
+            (0, vitest_1.expect)(readStoredReview(dir).items[0].status).toBe("queued");
+            await waitForCondition(() => readLog(dir).includes("已暂停"));
+            (0, vitest_1.expect)(errorSpy).not.toHaveBeenCalled();
+        }
+        finally {
+            errorSpy.mockRestore();
+        }
+    });
+    (0, vitest_1.it)("does not create a module without the environment variable", () => {
+        delete process.env.RN_GRAB_REVIEW_DIR;
+        const errorSpy = vitest_1.vi.spyOn(console, "error").mockImplementation(() => { });
+        try {
+            const { call, base } = makeMiddleware();
+            const response = makeRes();
+            call(makeReq(`${http_1.REVIEW_ROUTE_PREFIX}state`, { [http_1.REVIEW_CODE_HEADER]: "012345" }), response.res, () => { });
+            (0, vitest_1.expect)(response.status()).toBe(404);
+            (0, vitest_1.expect)(JSON.parse(response.body())).toEqual({ ok: false, error: "no_active_review" });
+            (0, vitest_1.expect)(errorSpy).not.toHaveBeenCalled();
+            (0, vitest_1.expect)(base).not.toHaveBeenCalled();
+        }
+        finally {
+            errorSpy.mockRestore();
+        }
+    });
+    (0, vitest_1.it)("prints the load failure once with directory and cause and retries loading on later requests", async () => {
+        const dir = (0, node_path_1.join)(root, "retry-");
+        process.env.RN_GRAB_REVIEW_DIR = dir;
+        const errorSpy = vitest_1.vi.spyOn(console, "error").mockImplementation(() => { });
+        try {
+            const { call } = makeMiddleware();
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledTimes(1);
+            const first = errorSpy.mock.calls[0][0];
+            (0, vitest_1.expect)(first).toContain(dir);
+            (0, vitest_1.expect)(first).toContain("review.json");
+            const failing = makeRes();
+            call(makeReq(`${http_1.REVIEW_ROUTE_PREFIX}state`), failing.res, () => { });
+            (0, vitest_1.expect)(failing.status()).toBe(500);
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledTimes(1);
+            store_1.ReviewStore.create(dir, { ...(0, fixtures_1.passed)(), codemakerBin: process.execPath });
+            const recovered = makeRes();
+            call(makeReq(`${http_1.REVIEW_ROUTE_PREFIX}state`, { [http_1.REVIEW_CODE_HEADER]: "012345" }), recovered.res, () => { });
+            (0, vitest_1.expect)(recovered.status()).toBe(200);
+            (0, vitest_1.expect)(errorSpy).toHaveBeenCalledTimes(1);
+        }
+        finally {
+            errorSpy.mockRestore();
+        }
     });
 });
 //# sourceMappingURL=runner.test.js.map

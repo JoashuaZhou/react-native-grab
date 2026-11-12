@@ -13,7 +13,12 @@ const createReviewModule = (dir) => {
     const lock = (0, runner_1.createAgentLock)(store.lockPath());
     const logFile = store.agentLogPath();
     const log = (line) => {
-        (0, node_fs_1.appendFileSync)(logFile, `${line}\n`, "utf8");
+        try {
+            (0, node_fs_1.appendFileSync)(logFile, `${line}\n`, "utf8");
+        }
+        catch {
+            return;
+        }
     };
     const git = (0, git_1.createGit)();
     const run = async (message) => {

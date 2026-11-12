@@ -10,7 +10,12 @@ export const createReviewModule = (dir) => {
     const lock = createAgentLock(store.lockPath());
     const logFile = store.agentLogPath();
     const log = (line) => {
-        appendFileSync(logFile, `${line}\n`, "utf8");
+        try {
+            appendFileSync(logFile, `${line}\n`, "utf8");
+        }
+        catch {
+            return;
+        }
     };
     const git = createGit();
     const run = async (message) => {
