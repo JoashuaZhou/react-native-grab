@@ -10,6 +10,7 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import { SCOPE_LABELS, type ItemScope } from "../../review-core/types";
 import { type ReviewApiError } from "./api";
 import { type ReviewScreenshot } from "./host";
@@ -67,7 +68,7 @@ const toErrorText = (error: ReviewApiError | null): string | null => {
   return `保存失败（${error.code}），请重试`;
 };
 
-const ComposerSheet = ({
+export const ComposerSheet = ({
   composer,
   error,
 }: {
@@ -123,7 +124,12 @@ const ComposerSheet = ({
   const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={styles.backdrop}>
+    // The same source of the status-bar inset as `grab-controls.tsx`; while the
+    // keyboard pushes the sheet up, its content stays below the status bar.
+    <KeyboardAvoidingView
+      behavior="padding"
+      style={[styles.backdrop, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }]}
+    >
       <Pressable
         onPress={() => {
           if (!isSaving) {
@@ -246,7 +252,13 @@ const ComposerSheet = ({
 };
 
 export const ReviewComposer = () => {
-  const { composer, error } = useReviewState();
+  const { composer, error, listVisible } = useReviewState();
+
+  // iOS cannot present a second Modal over the full-screen list; while the
+  // list is visible the sheet mounts inside the list Modal tree instead.
+  if (listVisible) {
+    return null;
+  }
 
   return (
     <Modal

@@ -58,7 +58,7 @@
     "version-packages": "changeset version",
     "release": "changeset publish",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "prepare": "husky"
+    "setup-hooks": "husky"
   },
   "dependencies": {
     "metro-config-transformers": "latest"

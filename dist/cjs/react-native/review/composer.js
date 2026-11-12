@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReviewComposer = void 0;
+exports.ReviewComposer = exports.ComposerSheet = void 0;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
+const react_native_safe_area_context_1 = require("react-native-safe-area-context");
 const types_1 = require("../../review-core/types");
 const store_1 = require("./store");
 const thumbnail_1 = require("./thumbnail");
@@ -82,7 +83,10 @@ const ComposerSheet = ({ composer, error, }) => {
         : (0, thumbnail_1.storedScreenshotSource)(composer.item.screenshotUrl);
     const screen = composer.mode === "create" ? (composer.draft.screen ?? null) : composer.item.screen;
     const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
-    return ((0, jsx_runtime_1.jsxs)(react_native_1.KeyboardAvoidingView, { behavior: "padding", style: styles.backdrop, children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => {
+    return (
+    // The same source of the status-bar inset as `grab-controls.tsx`; while the
+    // keyboard pushes the sheet up, its content stays below the status bar.
+    (0, jsx_runtime_1.jsxs)(react_native_1.KeyboardAvoidingView, { behavior: "padding", style: [styles.backdrop, { paddingTop: react_native_safe_area_context_1.initialWindowMetrics?.insets.top ?? 0 }], children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => {
                     if (!isSaving) {
                         store_1.reviewActions.closeComposer();
                     }
@@ -103,9 +107,15 @@ const ComposerSheet = ({ composer, error, }) => {
                                             (isSaving || !canSave) && styles.actionTextDisabled,
                                         ], children: toSaveLabel(composer) }) })] })] }) })] }));
 };
+exports.ComposerSheet = ComposerSheet;
 const ReviewComposer = () => {
-    const { composer, error } = (0, store_1.useReviewState)();
-    return ((0, jsx_runtime_1.jsx)(react_native_1.Modal, { animationType: "slide", onRequestClose: store_1.reviewActions.closeComposer, transparent: true, visible: composer !== null, children: composer !== null && (0, jsx_runtime_1.jsx)(ComposerSheet, { composer: composer, error: error }) }));
+    const { composer, error, listVisible } = (0, store_1.useReviewState)();
+    // iOS cannot present a second Modal over the full-screen list; while the
+    // list is visible the sheet mounts inside the list Modal tree instead.
+    if (listVisible) {
+        return null;
+    }
+    return ((0, jsx_runtime_1.jsx)(react_native_1.Modal, { animationType: "slide", onRequestClose: store_1.reviewActions.closeComposer, transparent: true, visible: composer !== null, children: composer !== null && (0, jsx_runtime_1.jsx)(exports.ComposerSheet, { composer: composer, error: error }) }));
 };
 exports.ReviewComposer = ReviewComposer;
 const styles = react_native_1.StyleSheet.create({

@@ -96,6 +96,7 @@ const startReview = async (opts, deps) => {
     const lan = deps.lanAddress();
     if (lan !== null) {
         deps.log(`局域网 IP：${lan}`);
+        deps.log(`在 App 的 Debug 设置里把 React Native 开发服务器地址设为 ${lan}，重启 App`);
     }
     deps.log("设计师步骤：确认手机与电脑连接同一 Wi-Fi，打开 App 的走查入口，输入配对码。");
     deps.log(`codemaker ${worktree} --session ${sessionId}`);

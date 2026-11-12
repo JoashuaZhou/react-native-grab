@@ -10,8 +10,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import type { DeviceItemView } from "../../review-core/types";
 import { type ReviewApiError } from "./api";
+import { ComposerSheet } from "./composer";
 import { reviewActions, useReviewState } from "./store";
 import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
 import { footerState, groupItemsByStatus, revertHint } from "./view-model";
@@ -207,7 +209,7 @@ const PairingView = ({ error }: { error: ReviewApiError | null }) => {
 };
 
 export const ReviewListPanel = () => {
-  const { error, items, listVisible, paired, review, runner } = useReviewState();
+  const { composer, error, items, listVisible, paired, review, runner } = useReviewState();
   const [pending, setPending] = useState(false);
 
   const runAction = async (task: () => Promise<boolean>) => {
@@ -245,7 +247,7 @@ export const ReviewListPanel = () => {
       visible={listVisible}
     >
       <View style={styles.panel}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }]}>
           <Text style={styles.headerTitle}>走查列表</Text>
           <Pressable hitSlop={8} onPress={reviewActions.closeList}>
             <Text style={styles.headerAction}>关闭</Text>
@@ -317,6 +319,12 @@ export const ReviewListPanel = () => {
             </View>
           </>
         )}
+
+        {listVisible && composer !== null && (
+          <View style={styles.composerOverlay}>
+            <ComposerSheet composer={composer} error={error} />
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -326,6 +334,10 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     backgroundColor: "#F4F4F5",
+  },
+  composerOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2,
   },
   header: {
     alignItems: "center",

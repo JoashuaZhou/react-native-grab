@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DeviceItemView, DeviceReviewView } from "../../../review-core/types";
 import type { ReviewApiError } from "../api";
 import type { ReviewStoreState } from "../store";
 
@@ -15,6 +16,7 @@ const hooks = vi.hoisted(() => ({
 const runtime = vi.hoisted(() => ({
   reviewState: null as unknown as ReviewStoreState,
   pairCalls: [] as unknown[],
+  safeAreaMetrics: null as { insets: { top: number } } | null,
 }));
 
 vi.mock("react", async (importOriginal) => ({
@@ -54,6 +56,12 @@ vi.mock("react-native", () => ({
   View: "View",
 }));
 
+vi.mock("react-native-safe-area-context", () => ({
+  get initialWindowMetrics() {
+    return runtime.safeAreaMetrics;
+  },
+}));
+
 vi.mock("../store", () => ({
   PAIRING_CODE_STORAGE_KEY: "rnGrabReview.pairingCode",
   reviewActions: {
@@ -89,6 +97,39 @@ const renderPanel = (): ElementLike => {
   const pairing = asElement((content.props.children as unknown[])[1]);
   return asElement((pairing.type as (props: unknown) => unknown)(pairing.props));
 };
+
+const panelContent = (): ElementLike => {
+  hooks.order = 0;
+  const panel = asElement(ReviewListPanel());
+  return asElement(panel.props.children as unknown);
+};
+
+const reviewView = (): DeviceReviewView => ({
+  id: "20261111-080000",
+  base: "main",
+  branch: "fix/design-review-20261111-0800",
+  status: "active",
+  mrUrl: null,
+});
+
+const itemView = (overrides: Partial<DeviceItemView> = {}): DeviceItemView => ({
+  no: 1,
+  kind: "element",
+  status: "draft",
+  scope: "local",
+  figmaUrl: null,
+  rounds: [],
+  screenshotUrl: null,
+  rect: null,
+  screen: null,
+  route: null,
+  device: null,
+  revertCommit: null,
+  lastError: null,
+  createdAt: "2026-11-11T08:00:00.000Z",
+  actions: [],
+  ...overrides,
+});
 
 afterEach(() => {
   hooks.values.length = 0;
@@ -127,5 +168,80 @@ describe("pairing view errors", () => {
 
     expect(runtime.pairCalls).toEqual([["012345"]]);
     expect(errorText.props.children).toBe("配对码不正确，请重试");
+  });
+});
+
+describe("header safe area", () => {
+  beforeEach(() => {
+    runtime.reviewState = baseState();
+    runtime.pairCalls.length = 0;
+    runtime.safeAreaMetrics = null;
+  });
+
+  it("pads the header by the status-bar inset from the initial window metrics", () => {
+    runtime.safeAreaMetrics = { insets: { top: 59 } };
+
+    const header = asElement((panelContent().props.children as unknown[])[0]);
+    const style = header.props.style as unknown as [unknown, { paddingTop: number }];
+
+    expect(style[1].paddingTop).toBe(59);
+  });
+
+  it("falls back to zero header padding without safe-area metrics", () => {
+    runtime.safeAreaMetrics = null;
+
+    const header = asElement((panelContent().props.children as unknown[])[0]);
+    const style = header.props.style as unknown as [unknown, { paddingTop: number }];
+
+    expect(style[1].paddingTop).toBe(0);
+  });
+});
+
+describe("footer finish button", () => {
+  beforeEach(() => {
+    runtime.reviewState = {
+      ...baseState(),
+      paired: true,
+      review: reviewView(),
+    };
+    runtime.pairCalls.length = 0;
+    runtime.safeAreaMetrics = null;
+  });
+
+  const footerOf = (): ElementLike => {
+    // Paired body fragment children: busy banner, blocked banner, list,
+    // action error, footer.
+    const body = asElement((panelContent().props.children as unknown[])[1]);
+    return asElement((body.props.children as unknown[])[4]);
+  };
+
+  it("stays hidden for an empty review, even though every item is terminal", () => {
+    runtime.reviewState = { ...runtime.reviewState, items: [] as DeviceItemView[] };
+
+    const finish = (footerOf().props.children as unknown[])[1];
+
+    expect(finish).toBeFalsy();
+  });
+
+  it("stays hidden when every item was reverted and none passed", () => {
+    runtime.reviewState = {
+      ...runtime.reviewState,
+      items: [itemView({ status: "reverted" }), itemView({ no: 2, status: "reverted" })],
+    };
+
+    const finish = (footerOf().props.children as unknown[])[1];
+
+    expect(finish).toBeFalsy();
+  });
+
+  it("shows once every item is terminal and at least one passed", () => {
+    runtime.reviewState = {
+      ...runtime.reviewState,
+      items: [itemView({ status: "passed" }), itemView({ no: 2, status: "reverted" })],
+    };
+
+    const finish = asElement((footerOf().props.children as unknown[])[1]);
+
+    expect(finish.props.label).toBe("完成走查");
   });
 });

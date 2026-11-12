@@ -1,6 +1,7 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from "react";
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, } from "react-native";
+import { initialWindowMetrics } from "react-native-safe-area-context";
 import { SCOPE_LABELS } from "../../review-core/types";
 import { reviewActions, useReviewState } from "./store";
 import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
@@ -40,7 +41,7 @@ const toErrorText = (error) => {
     }
     return `保存失败（${error.code}），请重试`;
 };
-const ComposerSheet = ({ composer, error, }) => {
+export const ComposerSheet = ({ composer, error, }) => {
     const [form, setForm] = useState(() => toFormState(composer));
     const [lastComposer, setLastComposer] = useState(composer);
     const [isSaving, setIsSaving] = useState(false);
@@ -79,7 +80,10 @@ const ComposerSheet = ({ composer, error, }) => {
         : storedScreenshotSource(composer.item.screenshotUrl);
     const screen = composer.mode === "create" ? (composer.draft.screen ?? null) : composer.item.screen;
     const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
-    return (_jsxs(KeyboardAvoidingView, { behavior: "padding", style: styles.backdrop, children: [_jsx(Pressable, { onPress: () => {
+    return (
+    // The same source of the status-bar inset as `grab-controls.tsx`; while the
+    // keyboard pushes the sheet up, its content stays below the status bar.
+    _jsxs(KeyboardAvoidingView, { behavior: "padding", style: [styles.backdrop, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }], children: [_jsx(Pressable, { onPress: () => {
                     if (!isSaving) {
                         reviewActions.closeComposer();
                     }
@@ -101,7 +105,12 @@ const ComposerSheet = ({ composer, error, }) => {
                                         ], children: toSaveLabel(composer) }) })] })] }) })] }));
 };
 export const ReviewComposer = () => {
-    const { composer, error } = useReviewState();
+    const { composer, error, listVisible } = useReviewState();
+    // iOS cannot present a second Modal over the full-screen list; while the
+    // list is visible the sheet mounts inside the list Modal tree instead.
+    if (listVisible) {
+        return null;
+    }
     return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeComposer, transparent: true, visible: composer !== null, children: composer !== null && _jsx(ComposerSheet, { composer: composer, error: error }) }));
 };
 const styles = StyleSheet.create({

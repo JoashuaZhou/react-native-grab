@@ -135,8 +135,14 @@ describe("footerState", () => {
     expect(footerState(reviewView(), [passed, awaiting]).canFinish).toBe(false);
   });
 
-  it("allows finishing an empty review, like the store does", () => {
-    expect(footerState(reviewView(), []).canFinish).toBe(true);
+  it("blocks finishing an empty review even though the store allows it", () => {
+    expect(footerState(reviewView(), []).canFinish).toBe(false);
+  });
+
+  it("blocks finishing when every item was reverted and none passed", () => {
+    const reverted = itemView({ no: 1, status: "reverted" });
+    const revertedToo = itemView({ no: 2, status: "reverted" });
+    expect(footerState(reviewView(), [reverted, revertedToo]).canFinish).toBe(false);
   });
 
   it("never allows finishing a review that is no longer active", () => {

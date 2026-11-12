@@ -192,6 +192,9 @@ describe("startReview", () => {
     expect(printed).toContain("314159");
     expect(printed).toContain("192.168.31.4");
     expect(printed).toContain("Wi-Fi");
+    expect(lines).toContain(
+      "在 App 的 Debug 设置里把 React Native 开发服务器地址设为 192.168.31.4，重启 App",
+    );
     expect(printed).toContain(`codemaker ${worktree} --session sess-1`);
   });
 
@@ -199,6 +202,7 @@ describe("startReview", () => {
     const { deps, lines, calls } = makeDeps(root, { lanAddress: null });
     await startReview({ repo, base: "main" }, deps);
     expect(lines.join("\n")).not.toContain("局域网");
+    expect(lines.join("\n")).not.toContain("重启 App");
     expect(calls.map((call) => call.name)).toContain("spawnMetro");
   });
 

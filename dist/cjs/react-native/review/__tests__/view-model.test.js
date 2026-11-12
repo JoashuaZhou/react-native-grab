@@ -111,8 +111,13 @@ const reviewView = (overrides = {}) => ({
         const awaiting = itemView({ no: 2, status: "awaiting_review" });
         (0, vitest_1.expect)((0, view_model_1.footerState)(reviewView(), [passed, awaiting]).canFinish).toBe(false);
     });
-    (0, vitest_1.it)("allows finishing an empty review, like the store does", () => {
-        (0, vitest_1.expect)((0, view_model_1.footerState)(reviewView(), []).canFinish).toBe(true);
+    (0, vitest_1.it)("blocks finishing an empty review even though the store allows it", () => {
+        (0, vitest_1.expect)((0, view_model_1.footerState)(reviewView(), []).canFinish).toBe(false);
+    });
+    (0, vitest_1.it)("blocks finishing when every item was reverted and none passed", () => {
+        const reverted = itemView({ no: 1, status: "reverted" });
+        const revertedToo = itemView({ no: 2, status: "reverted" });
+        (0, vitest_1.expect)((0, view_model_1.footerState)(reviewView(), [reverted, revertedToo]).canFinish).toBe(false);
     });
     (0, vitest_1.it)("never allows finishing a review that is no longer active", () => {
         const passed = itemView({ status: "passed" });

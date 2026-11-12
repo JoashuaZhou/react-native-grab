@@ -1,6 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, } from "react-native";
+import { initialWindowMetrics } from "react-native-safe-area-context";
+import { ComposerSheet } from "./composer";
 import { reviewActions, useReviewState } from "./store";
 import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
 import { footerState, groupItemsByStatus, revertHint } from "./view-model";
@@ -79,7 +81,7 @@ const PairingView = ({ error }) => {
     return (_jsxs(View, { style: styles.centered, children: [_jsx(Text, { style: styles.pairingTitle, children: "\u8FDE\u63A5\u8D70\u67E5" }), _jsx(TextInput, { keyboardType: "number-pad", maxLength: 6, onChangeText: (text) => setCode(text.replace(/\D/g, "").slice(0, 6)), placeholder: "\u8BF7\u8F93\u5165 6 \u4F4D\u914D\u5BF9\u7801", style: styles.pairingInput, value: code }), pairingErrorText(error, hasPairAttempt) !== null && (_jsx(Text, { style: styles.errorText, children: pairingErrorText(error, hasPairAttempt) })), _jsx(ActionButton, { disabled: isPairing || code.length !== 6, label: isPairing ? "配对中…" : "配对", onPress: () => void handlePair(), primary: true })] }));
 };
 export const ReviewListPanel = () => {
-    const { error, items, listVisible, paired, review, runner } = useReviewState();
+    const { composer, error, items, listVisible, paired, review, runner } = useReviewState();
     const [pending, setPending] = useState(false);
     const runAction = async (task) => {
         if (pending) {
@@ -106,14 +108,18 @@ export const ReviewListPanel = () => {
     };
     const footer = footerState(review, items);
     const groups = groupItemsByStatus(items);
-    return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeList, statusBarTranslucent: true, visible: listVisible, children: _jsxs(View, { style: styles.panel, children: [_jsxs(View, { style: styles.header, children: [_jsx(Text, { style: styles.headerTitle, children: "\u8D70\u67E5\u5217\u8868" }), _jsx(Pressable, { hitSlop: 8, onPress: reviewActions.closeList, children: _jsx(Text, { style: styles.headerAction, children: "\u5173\u95ED" }) })] }), !paired ? (_jsx(PairingView, { error: error })) : (_jsxs(_Fragment, { children: [runner.busy && _jsx(Text, { style: styles.banner, children: BUSY_BANNER }), runner.blocked && (_jsx(Text, { style: [styles.banner, styles.bannerError], children: BLOCKED_BANNER })), _jsxs(ScrollView, { bounces: false, contentContainerStyle: styles.listContent, children: [groups.length === 0 && (_jsx(Text, { style: styles.emptyText, children: review === null ? "加载中…" : "暂无条目" })), groups.map((group) => (_jsxs(View, { children: [_jsx(Text, { style: styles.groupLabel, children: group.label }), group.items.map((item) => (_jsx(ItemRow, { busy: runner.busy, item: item, onDelete: () => void runAction(() => reviewActions.remove(item.no)), onEdit: () => reviewActions.openComposer({ mode: "edit", item }), onPass: () => void runAction(() => reviewActions.pass(item.no)), onReject: () => reviewActions.openComposer({ mode: "reject", item }), onRevert: () => confirmRevert(item), pending: pending }, item.no)))] }, group.status)))] }), actionErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: actionErrorText(error) })), _jsxs(View, { style: styles.footer, children: [_jsx(ActionButton, { disabled: pending || footer.submitCount === 0, label: `提交（${footer.submitCount}）`, onPress: () => void runAction(() => reviewActions.submit()), primary: footer.submitCount > 0 }), footer.mrUrl !== null ? (_jsx(ActionButton, { disabled: false, label: "\u67E5\u770B MR", onPress: () => {
+    return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeList, statusBarTranslucent: true, visible: listVisible, children: _jsxs(View, { style: styles.panel, children: [_jsxs(View, { style: [styles.header, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }], children: [_jsx(Text, { style: styles.headerTitle, children: "\u8D70\u67E5\u5217\u8868" }), _jsx(Pressable, { hitSlop: 8, onPress: reviewActions.closeList, children: _jsx(Text, { style: styles.headerAction, children: "\u5173\u95ED" }) })] }), !paired ? (_jsx(PairingView, { error: error })) : (_jsxs(_Fragment, { children: [runner.busy && _jsx(Text, { style: styles.banner, children: BUSY_BANNER }), runner.blocked && (_jsx(Text, { style: [styles.banner, styles.bannerError], children: BLOCKED_BANNER })), _jsxs(ScrollView, { bounces: false, contentContainerStyle: styles.listContent, children: [groups.length === 0 && (_jsx(Text, { style: styles.emptyText, children: review === null ? "加载中…" : "暂无条目" })), groups.map((group) => (_jsxs(View, { children: [_jsx(Text, { style: styles.groupLabel, children: group.label }), group.items.map((item) => (_jsx(ItemRow, { busy: runner.busy, item: item, onDelete: () => void runAction(() => reviewActions.remove(item.no)), onEdit: () => reviewActions.openComposer({ mode: "edit", item }), onPass: () => void runAction(() => reviewActions.pass(item.no)), onReject: () => reviewActions.openComposer({ mode: "reject", item }), onRevert: () => confirmRevert(item), pending: pending }, item.no)))] }, group.status)))] }), actionErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: actionErrorText(error) })), _jsxs(View, { style: styles.footer, children: [_jsx(ActionButton, { disabled: pending || footer.submitCount === 0, label: `提交（${footer.submitCount}）`, onPress: () => void runAction(() => reviewActions.submit()), primary: footer.submitCount > 0 }), footer.mrUrl !== null ? (_jsx(ActionButton, { disabled: false, label: "\u67E5\u770B MR", onPress: () => {
                                         void Linking.openURL(footer.mrUrl ?? "").catch(() => { });
-                                    } })) : (footer.canFinish && (_jsx(ActionButton, { disabled: pending, label: "\u5B8C\u6210\u8D70\u67E5", onPress: () => void runAction(() => reviewActions.finish()), primary: true })))] })] }))] }) }));
+                                    } })) : (footer.canFinish && (_jsx(ActionButton, { disabled: pending, label: "\u5B8C\u6210\u8D70\u67E5", onPress: () => void runAction(() => reviewActions.finish()), primary: true })))] })] })), listVisible && composer !== null && (_jsx(View, { style: styles.composerOverlay, children: _jsx(ComposerSheet, { composer: composer, error: error }) }))] }) }));
 };
 const styles = StyleSheet.create({
     panel: {
         flex: 1,
         backgroundColor: "#F4F4F5",
+    },
+    composerOverlay: {
+        ...StyleSheet.absoluteFill,
+        zIndex: 2,
     },
     header: {
         alignItems: "center",

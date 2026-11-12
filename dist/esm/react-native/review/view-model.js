@@ -24,6 +24,9 @@ export const groupItemsByStatus = (items) => STATUS_ORDER.map((status) => ({
 export const footerState = (review, items) => ({
     submitCount: items.filter((item) => item.status === "draft").length,
     canFinish: review?.status === "active" &&
+        // At least one item must have passed: an empty or all-reverted review has
+        // no verified result to finish with.
+        items.some((item) => item.status === "passed") &&
         items.every((item) => item.status === "passed" || item.status === "reverted"),
     mrUrl: review?.mrUrl ?? null,
 });
