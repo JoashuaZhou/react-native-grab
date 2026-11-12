@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   PanResponder,
+  PixelRatio,
   Platform,
   StyleSheet,
   View,
   type LayoutChangeEvent,
 } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
+import type { ScreenInfo } from "../review-core/types";
+import { getFocusedScreenName } from "./containers";
 import { FullScreenOverlay } from "./full-screen-overlay";
 import { enableGrabbing, toggleGrabMenu, useGrabControllerState } from "./grab-controller";
-import { GrabControlBar } from "./grab-control-bar";
+import { BAR_WIDTH, GrabControlBar } from "./grab-control-bar";
+import { captureForReview } from "./review/capture";
+import { reviewActions, useReviewState } from "./review/store";
+import { awaitingCount } from "./review/view-model";
 
 const BAR_HEIGHT = 36;
-const BAR_WIDTH = 108;
 const BAR_TOP_INSET = 72 + (Platform.OS === "ios" ? (initialWindowMetrics?.insets.top ?? 0) : 0);
 
 type ControlsBounds = {
@@ -24,6 +30,12 @@ type ControlsBounds = {
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
+
+const getScreenInfo = (): ScreenInfo => ({
+  width: Dimensions.get("window").width,
+  height: Dimensions.get("window").height,
+  scale: PixelRatio.get(),
+});
 
 const getInitialBarPosition = (bounds: ControlsBounds) => {
   return {
@@ -45,6 +57,7 @@ const getInitialBarPosition = (bounds: ControlsBounds) => {
  */
 export const GrabOwnerControls = () => {
   const state = useGrabControllerState();
+  const reviewState = useReviewState();
   const controlBarPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const boundsRef = useRef<ControlsBounds | null>(null);
   const [hasBounds, setHasBounds] = useState(false);
@@ -144,6 +157,28 @@ export const GrabOwnerControls = () => {
     [controlBarPosition],
   );
 
+  const startPageReview = useCallback(async () => {
+    const screenshot = await captureForReview();
+    reviewActions.openComposer({
+      mode: "create",
+      draft: {
+        kind: "page",
+        description: "",
+        rect: null,
+        screen: getScreenInfo(),
+        route: getFocusedScreenName(),
+        grab: null,
+      },
+      screenshot,
+    });
+  }, []);
+
+  // The bar leaves the output completely while a screenshot is being taken, or
+  // while a review surface covers the screen, so captures stay clean.
+  if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
+    return null;
+  }
+
   return (
     // The anchor is absolutely positioned so that mounting the controls alongside
     // an owner cannot disturb the surrounding layout: that parent is free to be a
@@ -159,8 +194,11 @@ export const GrabOwnerControls = () => {
             dragHandlePanHandlers={dragHandlePanResponder.panHandlers}
             isSessionEnabled={state.selectionSessionOwnerId !== null}
             isVisible={isControlBarVisible}
+            listBadgeText={reviewState.paired ? String(awaitingCount(reviewState.items)) : "!"}
             onHidden={resetControlBarPosition}
             onPressHide={toggleGrabMenu}
+            onPressList={reviewActions.openList}
+            onPressPage={startPageReview}
             onPressSelect={enableGrabbing}
           />
         </View>

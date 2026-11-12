@@ -6,13 +6,14 @@ import {
   Image,
   Pressable,
   StyleSheet,
+  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 
 const BAR_HEIGHT = 36;
-const BAR_WIDTH = 108;
+export const BAR_WIDTH = 180;
 const SLOT_WIDTH = 36;
 
 // Icons from https://lucide.dev/
@@ -22,13 +23,20 @@ const HIDE_ICON_IMAGE_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABMElEQVR4AezRy20CMRAGYJQiUkcuSQu5pNxc0kJySR1Uwf+hNQ+tx14hIS4gDzue/7UML7s7f54B0wU/bEW/eTX1mufs4OCqFXf0C97D/k4xyKN7YDi4XUIV8BX2X4qQAaNcr44ZDAeX5orgUgXsAxIQMmDEMOPj0ZvBcHBpjuDlVxWAQ0DIgBFDxkpvBsPBpVnVKACZkAEjhj8ZKr0ZDCfj/pkFUDFg9J/L21J6M1hG9dkSUKs3IFsC2s69vTdXev8DbBgzC2DAqO38M27K/s1gOBn3zyiAkAEjhm3n9q43g+HgdhOqAAJCBowYMm4mejMYDi5Nw0/PKoCAkAEjhifR0pjBcHBpFuj8qAIwCBkwcu8VDAe3h++qgI+wFYO0w4ODq1bEKmBFvHXwDJhu7gAAAP//FX4TdAAAAAZJREFUAwAkFUAxInh9owAAAABJRU5ErkJggg==";
 const INSPECT_ICON_IMAGE_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABNUlEQVR4AezUYU7DMAwFYMPFKCcDTgacDPxFc5ROZazRNu3Hor46cWy/vDTpc1y53ZxgSUGfiZ9JyH3P3P6MCkwIQNIDdnbkvmUOmyZiJHhpnoiPtE+TkJupgYRdESzNE0FJTLbKXSp/VFC+i9oHwb/beXdb5JS4KyxsKXBUoc3tVeCuOILOObjxx0TGMEXQkvL1dUCadqkQlTK+jr0KuvSs8HpA+UoZsmkFVp51QzEwVsyvBRFENttH0epXkf6zHkUFKsICMt8HjOHba+8WyalVKmrMWi0LFgCUTStQoIorqs9X34XlWxEI4GzMOidQKmwTCOWrGsYN4xYJ4JTgJGyhyKtQrV5e+fQ7RgIBSNgecKIzxsnbDB0JBFih/XPstmBeHIhTGEa/uY5jgj5xZkdh+DP8FwAA//94DFv3AAAABklEQVQDANreSTEI+d7fAAAAAElFTkSuQmCC";
+const PAGE_ICON_IMAGE_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAANUlEQVR42mNgGHaAm1vwP6V4cFhAie9HLaCuBaRE6OC0YDSSRyN5CMbB0LOAZkE0tGu0IQcAmMrFiTjfvf0AAAAASUVORK5CYII=";
+const LIST_ICON_IMAGE_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAKUlEQVR42mNgGAUjE3BzC/4HYXQ+ITx4LBgFo6loNBWNpqLRVDQKqA0A0vpSsaUB4swAAAAASUVORK5CYII=";
 
 export type GrabControlBarProps = {
   dragHandlePanHandlers?: GestureResponderHandlers;
   isSessionEnabled: boolean;
   isVisible: boolean;
+  listBadgeText: string | null;
   onHidden?: () => void;
   onPressHide: () => void;
+  onPressList: () => void;
+  onPressPage: () => void;
   onPressSelect: () => void;
   containerStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
@@ -38,8 +46,11 @@ export const GrabControlBar = ({
   dragHandlePanHandlers,
   isSessionEnabled,
   isVisible,
+  listBadgeText,
   onHidden,
   onPressHide,
+  onPressList,
+  onPressPage,
   onPressSelect,
   containerStyle,
   style,
@@ -124,6 +135,39 @@ export const GrabControlBar = ({
             <View style={styles.divider} />
 
             <Pressable
+              accessibilityHint="Captures the whole screen for a review comment."
+              accessibilityLabel="截取整页"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onPressPage}
+              style={({ pressed }) => [styles.slot, pressed && styles.pressedButton]}
+            >
+              <Image source={{ uri: PAGE_ICON_IMAGE_URL }} style={styles.pageIcon} />
+            </Pressable>
+
+            <View style={styles.divider} />
+
+            <Pressable
+              accessibilityHint="Opens the design review list."
+              accessibilityLabel="走查列表"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onPressList}
+              style={({ pressed }) => [styles.slot, pressed && styles.pressedButton]}
+            >
+              <Image source={{ uri: LIST_ICON_IMAGE_URL }} style={styles.listIcon} />
+              {listBadgeText !== null && (
+                <View style={styles.slotBadge}>
+                  <Text numberOfLines={1} style={styles.slotBadgeText}>
+                    {listBadgeText}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+
+            <View style={styles.divider} />
+
+            <Pressable
               accessibilityHint="Hides the React Native Grab controls."
               accessibilityLabel="Hide controls"
               accessibilityRole="button"
@@ -183,6 +227,31 @@ const styles = StyleSheet.create({
   },
   inspectIconActive: {
     opacity: 0.72,
+  },
+  pageIcon: {
+    width: 16,
+    height: 16,
+  },
+  listIcon: {
+    width: 16,
+    height: 16,
+  },
+  slotBadge: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    minWidth: 14,
+    height: 14,
+    paddingHorizontal: 2,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF3B30",
+  },
+  slotBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700",
   },
   arrowIcon: {
     width: 16,

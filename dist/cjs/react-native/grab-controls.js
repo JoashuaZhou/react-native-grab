@@ -5,18 +5,26 @@ const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const react_native_safe_area_context_1 = require("react-native-safe-area-context");
+const containers_1 = require("./containers");
 const full_screen_overlay_1 = require("./full-screen-overlay");
 const grab_controller_1 = require("./grab-controller");
 const grab_control_bar_1 = require("./grab-control-bar");
+const capture_1 = require("./review/capture");
+const store_1 = require("./review/store");
+const view_model_1 = require("./review/view-model");
 const BAR_HEIGHT = 36;
-const BAR_WIDTH = 108;
 const BAR_TOP_INSET = 72 + (react_native_1.Platform.OS === "ios" ? (react_native_safe_area_context_1.initialWindowMetrics?.insets.top ?? 0) : 0);
 const clamp = (value, min, max) => {
     return Math.min(Math.max(value, min), max);
 };
+const getScreenInfo = () => ({
+    width: react_native_1.Dimensions.get("window").width,
+    height: react_native_1.Dimensions.get("window").height,
+    scale: react_native_1.PixelRatio.get(),
+});
 const getInitialBarPosition = (bounds) => {
     return {
-        x: clamp((bounds.width - BAR_WIDTH) / 2, 0, Math.max(0, bounds.width - BAR_WIDTH)),
+        x: clamp((bounds.width - grab_control_bar_1.BAR_WIDTH) / 2, 0, Math.max(0, bounds.width - grab_control_bar_1.BAR_WIDTH)),
         y: clamp(BAR_TOP_INSET, 0, Math.max(0, bounds.height - BAR_HEIGHT)),
     };
 };
@@ -33,6 +41,7 @@ const getInitialBarPosition = (bounds) => {
  */
 const GrabOwnerControls = () => {
     const state = (0, grab_controller_1.useGrabControllerState)();
+    const reviewState = (0, store_1.useReviewState)();
     const controlBarPosition = (0, react_1.useRef)(new react_native_1.Animated.ValueXY({ x: 0, y: 0 })).current;
     const boundsRef = (0, react_1.useRef)(null);
     const [hasBounds, setHasBounds] = (0, react_1.useState)(false);
@@ -56,7 +65,7 @@ const GrabOwnerControls = () => {
                 return;
             }
             controlBarPosition.setValue({
-                x: clamp(value.x, 0, Math.max(0, bounds.width - BAR_WIDTH)),
+                x: clamp(value.x, 0, Math.max(0, bounds.width - grab_control_bar_1.BAR_WIDTH)),
                 y: clamp(value.y, 0, Math.max(0, bounds.height - BAR_HEIGHT)),
             });
         });
@@ -105,12 +114,32 @@ const GrabOwnerControls = () => {
             transform: controlBarPosition.getTranslateTransform(),
         },
     ], [controlBarPosition]);
+    const startPageReview = (0, react_1.useCallback)(async () => {
+        const screenshot = await (0, capture_1.captureForReview)();
+        store_1.reviewActions.openComposer({
+            mode: "create",
+            draft: {
+                kind: "page",
+                description: "",
+                rect: null,
+                screen: getScreenInfo(),
+                route: (0, containers_1.getFocusedScreenName)(),
+                grab: null,
+            },
+            screenshot,
+        });
+    }, []);
+    // The bar leaves the output completely while a screenshot is being taken, or
+    // while a review surface covers the screen, so captures stay clean.
+    if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
+        return null;
+    }
     return (
     // The anchor is absolutely positioned so that mounting the controls alongside
     // an owner cannot disturb the surrounding layout: that parent is free to be a
     // `gap`-spaced flex container, and absolutely positioned children are not flex
     // items.
-    (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: (0, jsx_runtime_1.jsx)(full_screen_overlay_1.FullScreenOverlay, { children: (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: (0, jsx_runtime_1.jsx)(grab_control_bar_1.GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, onHidden: resetControlBarPosition, onPressHide: grab_controller_1.toggleGrabMenu, onPressSelect: grab_controller_1.enableGrabbing }) }) }) }));
+    (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: (0, jsx_runtime_1.jsx)(full_screen_overlay_1.FullScreenOverlay, { children: (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: (0, jsx_runtime_1.jsx)(grab_control_bar_1.GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: reviewState.paired ? String((0, view_model_1.awaitingCount)(reviewState.items)) : "!", onHidden: resetControlBarPosition, onPressHide: grab_controller_1.toggleGrabMenu, onPressList: store_1.reviewActions.openList, onPressPage: startPageReview, onPressSelect: grab_controller_1.enableGrabbing }) }) }) }));
 };
 exports.GrabOwnerControls = GrabOwnerControls;
 const styles = react_native_1.StyleSheet.create({

@@ -1,17 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GrabControlBar = void 0;
+exports.GrabControlBar = exports.BAR_WIDTH = void 0;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const BAR_HEIGHT = 36;
-const BAR_WIDTH = 108;
+exports.BAR_WIDTH = 180;
 const SLOT_WIDTH = 36;
 // Icons from https://lucide.dev/
 const DRAG_ICON_IMAGE_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAsElEQVR4AdySMQqAMAxFxUWv6eiJHL2mbr5AyfAhQ0PaQUnhhzR5pvx1Gfz9D3DwYk87ppEelnfX9Ikuxm3tmEZ6WN5dU4BPqxIKOBn8tmMa6WF5d00BN+P2dkwjPSzvrinAp1WJ6YCUFdk27NMNUlYEEPYpgLu1oYCUFfmlsE8BKSsCCPsUwN3amA4I7cZeqZpuENoNQKqmAObUhgJCu4FN1RQQ2g1AqqYA5tTGcMAHAAD//+qsAJ8AAAAGSURBVAMAklJIMadtfagAAAAASUVORK5CYII=";
 const HIDE_ICON_IMAGE_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABMElEQVR4AezRy20CMRAGYJQiUkcuSQu5pNxc0kJySR1Uwf+hNQ+tx14hIS4gDzue/7UML7s7f54B0wU/bEW/eTX1mufs4OCqFXf0C97D/k4xyKN7YDi4XUIV8BX2X4qQAaNcr44ZDAeX5orgUgXsAxIQMmDEMOPj0ZvBcHBpjuDlVxWAQ0DIgBFDxkpvBsPBpVnVKACZkAEjhj8ZKr0ZDCfj/pkFUDFg9J/L21J6M1hG9dkSUKs3IFsC2s69vTdXev8DbBgzC2DAqO38M27K/s1gOBn3zyiAkAEjhm3n9q43g+HgdhOqAAJCBowYMm4mejMYDi5Nw0/PKoCAkAEjhifR0pjBcHBpFuj8qAIwCBkwcu8VDAe3h++qgI+wFYO0w4ODq1bEKmBFvHXwDJhu7gAAAP//FX4TdAAAAAZJREFUAwAkFUAxInh9owAAAABJRU5ErkJggg==";
 const INSPECT_ICON_IMAGE_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABNUlEQVR4AezUYU7DMAwFYMPFKCcDTgacDPxFc5ROZazRNu3Hor46cWy/vDTpc1y53ZxgSUGfiZ9JyH3P3P6MCkwIQNIDdnbkvmUOmyZiJHhpnoiPtE+TkJupgYRdESzNE0FJTLbKXSp/VFC+i9oHwb/beXdb5JS4KyxsKXBUoc3tVeCuOILOObjxx0TGMEXQkvL1dUCadqkQlTK+jr0KuvSs8HpA+UoZsmkFVp51QzEwVsyvBRFENttH0epXkf6zHkUFKsICMt8HjOHba+8WyalVKmrMWi0LFgCUTStQoIorqs9X34XlWxEI4GzMOidQKmwTCOWrGsYN4xYJ4JTgJGyhyKtQrV5e+fQ7RgIBSNgecKIzxsnbDB0JBFih/XPstmBeHIhTGEa/uY5jgj5xZkdh+DP8FwAA//94DFv3AAAABklEQVQDANreSTEI+d7fAAAAAElFTkSuQmCC";
-const GrabControlBar = ({ dragHandlePanHandlers, isSessionEnabled, isVisible, onHidden, onPressHide, onPressSelect, containerStyle, style, }) => {
+const PAGE_ICON_IMAGE_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAANUlEQVR42mNgGHaAm1vwP6V4cFhAie9HLaCuBaRE6OC0YDSSRyN5CMbB0LOAZkE0tGu0IQcAmMrFiTjfvf0AAAAASUVORK5CYII=";
+const LIST_ICON_IMAGE_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAKUlEQVR42mNgGAUjE3BzC/4HYXQ+ITx4LBgFo6loNBWNpqLRVDQKqA0A0vpSsaUB4swAAAAASUVORK5CYII=";
+const GrabControlBar = ({ dragHandlePanHandlers, isSessionEnabled, isVisible, listBadgeText, onHidden, onPressHide, onPressList, onPressPage, onPressSelect, containerStyle, style, }) => {
     const [isRendered, setIsRendered] = (0, react_1.useState)(isVisible);
     const visibilityProgress = (0, react_1.useRef)(new react_native_1.Animated.Value(isVisible ? 1 : 0)).current;
     (0, react_1.useEffect)(() => {
@@ -50,13 +52,13 @@ const GrabControlBar = ({ dragHandlePanHandlers, isSessionEnabled, isVisible, on
     if (!isRendered) {
         return null;
     }
-    return ((0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { pointerEvents: isVisible ? "auto" : "none", style: containerStyle, children: (0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { style: containerAnimatedStyle, children: (0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { style: [styles.container, style], children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.content, children: [(0, jsx_runtime_1.jsx)(react_native_1.View, { accessibilityHint: "Drag to reposition the React Native Grab controls.", accessibilityLabel: "Move controls", accessibilityRole: "adjustable", style: styles.slot, ...dragHandlePanHandlers, children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: DRAG_ICON_IMAGE_URL }, style: styles.dragIcon }) }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityHint: "Starts selecting an element to copy its description.", accessibilityLabel: "Select element", accessibilityRole: "button", hitSlop: 8, onPress: onPressSelect, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: INSPECT_ICON_IMAGE_URL }, style: [styles.inspectIcon, isSessionEnabled && styles.inspectIconActive] }) }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityHint: "Hides the React Native Grab controls.", accessibilityLabel: "Hide controls", accessibilityRole: "button", hitSlop: 8, onPress: onPressHide, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: HIDE_ICON_IMAGE_URL }, style: styles.arrowIcon }) })] }) }) }) }));
+    return ((0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { pointerEvents: isVisible ? "auto" : "none", style: containerStyle, children: (0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { style: containerAnimatedStyle, children: (0, jsx_runtime_1.jsx)(react_native_1.Animated.View, { style: [styles.container, style], children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.content, children: [(0, jsx_runtime_1.jsx)(react_native_1.View, { accessibilityHint: "Drag to reposition the React Native Grab controls.", accessibilityLabel: "Move controls", accessibilityRole: "adjustable", style: styles.slot, ...dragHandlePanHandlers, children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: DRAG_ICON_IMAGE_URL }, style: styles.dragIcon }) }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityHint: "Starts selecting an element to copy its description.", accessibilityLabel: "Select element", accessibilityRole: "button", hitSlop: 8, onPress: onPressSelect, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: INSPECT_ICON_IMAGE_URL }, style: [styles.inspectIcon, isSessionEnabled && styles.inspectIconActive] }) }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityHint: "Captures the whole screen for a review comment.", accessibilityLabel: "\u622A\u53D6\u6574\u9875", accessibilityRole: "button", hitSlop: 8, onPress: onPressPage, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: PAGE_ICON_IMAGE_URL }, style: styles.pageIcon }) }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsxs)(react_native_1.Pressable, { accessibilityHint: "Opens the design review list.", accessibilityLabel: "\u8D70\u67E5\u5217\u8868", accessibilityRole: "button", hitSlop: 8, onPress: onPressList, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: [(0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: LIST_ICON_IMAGE_URL }, style: styles.listIcon }), listBadgeText !== null && ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.slotBadge, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { numberOfLines: 1, style: styles.slotBadgeText, children: listBadgeText }) }))] }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.divider }), (0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityHint: "Hides the React Native Grab controls.", accessibilityLabel: "Hide controls", accessibilityRole: "button", hitSlop: 8, onPress: onPressHide, style: ({ pressed }) => [styles.slot, pressed && styles.pressedButton], children: (0, jsx_runtime_1.jsx)(react_native_1.Image, { source: { uri: HIDE_ICON_IMAGE_URL }, style: styles.arrowIcon }) })] }) }) }) }));
 };
 exports.GrabControlBar = GrabControlBar;
 const styles = react_native_1.StyleSheet.create({
     container: {
         height: BAR_HEIGHT,
-        width: BAR_WIDTH,
+        width: exports.BAR_WIDTH,
         borderRadius: BAR_HEIGHT / 2,
         shadowColor: "#000000",
         shadowOffset: { width: 0, height: 6 },
@@ -96,6 +98,31 @@ const styles = react_native_1.StyleSheet.create({
     },
     inspectIconActive: {
         opacity: 0.72,
+    },
+    pageIcon: {
+        width: 16,
+        height: 16,
+    },
+    listIcon: {
+        width: 16,
+        height: 16,
+    },
+    slotBadge: {
+        position: "absolute",
+        top: 3,
+        right: 3,
+        minWidth: 14,
+        height: 14,
+        paddingHorizontal: 2,
+        borderRadius: 7,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#FF3B30",
+    },
+    slotBadgeText: {
+        color: "#FFFFFF",
+        fontSize: 9,
+        fontWeight: "700",
     },
     arrowIcon: {
         width: 16,

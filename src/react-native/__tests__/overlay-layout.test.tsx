@@ -87,6 +87,9 @@ const controls = async () => {
   const { GrabOwnerControls } =
     await vi.importActual<typeof import("../grab-controls")>("../grab-controls");
   const anchor = GrabOwnerControls();
+  if (anchor === null) {
+    throw new Error("GrabOwnerControls did not render");
+  }
   const measuringView = anchor.props.children.props.children;
   const bar = measuringView.props.children;
   const position = bar.props.containerStyle[1].transform[0].translateX;
@@ -118,7 +121,7 @@ describe("development overlay layout", () => {
   it("places the iOS toolbar below the initial window safe area", async () => {
     const bar = await controls();
     bar.layout(402, 874);
-    expect(bar.position()).toEqual({ x: 147, y: 134 });
+    expect(bar.position()).toEqual({ x: 111, y: 134 });
   });
 
   it.each([
@@ -129,27 +132,27 @@ describe("development overlay layout", () => {
     const bar = await controls();
     bar.layout(width, height);
     bar.layout(402, 874);
-    expect(bar.position()).toEqual({ x: 147, y: 134 });
+    expect(bar.position()).toEqual({ x: 111, y: 134 });
   });
 
   it("keeps the Android toolbar at the existing margin", async () => {
     runtime.platform = "android";
     const bar = await controls();
     bar.layout(402, 874);
-    expect(bar.position()).toEqual({ x: 147, y: 72 });
+    expect(bar.position()).toEqual({ x: 111, y: 72 });
   });
 
   it("keeps the toolbar inside a short presented surface", async () => {
     const bar = await controls();
     bar.layout(402, 100);
-    expect(bar.position()).toEqual({ x: 147, y: 64 });
+    expect(bar.position()).toEqual({ x: 111, y: 64 });
   });
 
   it("uses the existing margin when initial metrics are unavailable", async () => {
     runtime.metrics = null;
     const bar = await controls();
     bar.layout(402, 874);
-    expect(bar.position()).toEqual({ x: 147, y: 72 });
+    expect(bar.position()).toEqual({ x: 111, y: 72 });
   });
 
   it("keeps the selection layer full size on RN 0.88", async () => {

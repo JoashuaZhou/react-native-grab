@@ -6,6 +6,7 @@ import {
   GrabSelectionOwnerView,
   useGrabSelectionOwner,
 } from "./grab-selection-owner";
+import { ReviewLayer } from "./review/review-layer";
 
 export type ReactNativeGrabRootProps = ViewProps;
 
@@ -24,6 +25,7 @@ export const ReactNativeGrabRoot = ({ children, style, ...props }: ReactNativeGr
       style={[grabSelectionOwnerFillStyle, style]}
     >
       {children}
+      <ReviewLayer />
     </GrabSelectionOwnerView>
   );
 };

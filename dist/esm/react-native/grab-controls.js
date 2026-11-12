@@ -1,16 +1,24 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, PanResponder, Platform, StyleSheet, View, } from "react-native";
+import { Animated, Dimensions, PanResponder, PixelRatio, Platform, StyleSheet, View, } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
+import { getFocusedScreenName } from "./containers";
 import { FullScreenOverlay } from "./full-screen-overlay";
 import { enableGrabbing, toggleGrabMenu, useGrabControllerState } from "./grab-controller";
-import { GrabControlBar } from "./grab-control-bar";
+import { BAR_WIDTH, GrabControlBar } from "./grab-control-bar";
+import { captureForReview } from "./review/capture";
+import { reviewActions, useReviewState } from "./review/store";
+import { awaitingCount } from "./review/view-model";
 const BAR_HEIGHT = 36;
-const BAR_WIDTH = 108;
 const BAR_TOP_INSET = 72 + (Platform.OS === "ios" ? (initialWindowMetrics?.insets.top ?? 0) : 0);
 const clamp = (value, min, max) => {
     return Math.min(Math.max(value, min), max);
 };
+const getScreenInfo = () => ({
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
+    scale: PixelRatio.get(),
+});
 const getInitialBarPosition = (bounds) => {
     return {
         x: clamp((bounds.width - BAR_WIDTH) / 2, 0, Math.max(0, bounds.width - BAR_WIDTH)),
@@ -30,6 +38,7 @@ const getInitialBarPosition = (bounds) => {
  */
 export const GrabOwnerControls = () => {
     const state = useGrabControllerState();
+    const reviewState = useReviewState();
     const controlBarPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
     const boundsRef = useRef(null);
     const [hasBounds, setHasBounds] = useState(false);
@@ -102,12 +111,32 @@ export const GrabOwnerControls = () => {
             transform: controlBarPosition.getTranslateTransform(),
         },
     ], [controlBarPosition]);
+    const startPageReview = useCallback(async () => {
+        const screenshot = await captureForReview();
+        reviewActions.openComposer({
+            mode: "create",
+            draft: {
+                kind: "page",
+                description: "",
+                rect: null,
+                screen: getScreenInfo(),
+                route: getFocusedScreenName(),
+                grab: null,
+            },
+            screenshot,
+        });
+    }, []);
+    // The bar leaves the output completely while a screenshot is being taken, or
+    // while a review surface covers the screen, so captures stay clean.
+    if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
+        return null;
+    }
     return (
     // The anchor is absolutely positioned so that mounting the controls alongside
     // an owner cannot disturb the surrounding layout: that parent is free to be a
     // `gap`-spaced flex container, and absolutely positioned children are not flex
     // items.
-    _jsx(View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: _jsx(FullScreenOverlay, { children: _jsx(View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: _jsx(GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, onHidden: resetControlBarPosition, onPressHide: toggleGrabMenu, onPressSelect: enableGrabbing }) }) }) }));
+    _jsx(View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: _jsx(FullScreenOverlay, { children: _jsx(View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: _jsx(GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: reviewState.paired ? String(awaitingCount(reviewState.items)) : "!", onHidden: resetControlBarPosition, onPressHide: toggleGrabMenu, onPressList: reviewActions.openList, onPressPage: startPageReview, onPressSelect: enableGrabbing }) }) }) }));
 };
 const styles = StyleSheet.create({
     overlayAnchor: {

@@ -26,6 +26,7 @@ vi.mock("react", async (importOriginal) => ({
       },
     ];
   },
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
 }));
 
 vi.mock("react-native", () => ({

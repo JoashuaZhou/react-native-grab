@@ -1,19 +1,28 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder, Pressable, StyleSheet, Text, View, } from "react-native";
-import { getGrabSelectionOwner, useIsResolvedGrabSelectionOwner } from "./containers";
+import { Dimensions, PanResponder, PixelRatio, Pressable, StyleSheet, Text, View, } from "react-native";
+import { getFocusedScreenName, getGrabSelectionOwner, useIsResolvedGrabSelectionOwner, } from "./containers";
 import { copyViaMetro } from "./copy";
 import { ContextMenu } from "./context-menu";
 import { GRAB_BADGE_BACKGROUND, GRAB_HIGHLIGHT_FILL, GRAB_PRIMARY } from "./grab-colors";
-import { clearGrabOwnerPresentation, hideGrabSelectionMenu, registerLocalGrabSelectionController, setGrabSelectionSessionOwner, showGrabSelectionMenu, unregisterLocalGrabSelectionController, } from "./grab-controller";
+import { clearGrabOwnerPresentation, hideGrabSelectionMenu, registerLocalGrabSelectionController, setGrabSelectionSessionOwner, showGrabSelectionMenu, unregisterLocalGrabSelectionController, useGrabControllerState, } from "./grab-controller";
 import { getDescription, getGrabSelectionTitle } from "./description";
 import { getOpenFrame } from "./get-open-frame";
 import { getRenderedBy } from "./get-rendered-by";
 import { findNodeAtPoint, getFabricWindowOffset, measureInWindow } from "./measure";
 import { openStackFrameInEditor } from "./open";
+import { captureForReview } from "./review/capture";
+import { isReviewPaired, reviewActions } from "./review/store";
+import { toWindowRect } from "./review/view-model";
 const COPY_BADGE_DURATION_MS = 1600;
+const getScreenInfo = () => ({
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
+    scale: PixelRatio.get(),
+});
 export const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
     const isResolvedSelectionOwner = useIsResolvedGrabSelectionOwner(ownerId);
+    const { isCapturing } = useGrabControllerState();
     const copyBadgeTimeoutRef = useRef(null);
     const windowOffsetRef = useRef([0, 0]);
     const [bounds, setBounds] = useState({ width: 0, height: 0 });
@@ -124,6 +133,30 @@ export const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             getDescription(result.fiberNode),
             getRenderedBy(result.fiberNode),
         ]);
+        if (isReviewPaired()) {
+            const screenshot = await captureForReview();
+            reviewActions.openComposer({
+                mode: "create",
+                draft: {
+                    kind: "element",
+                    description: "",
+                    rect: toWindowRect(result.rect, windowOffsetRef.current),
+                    screen: getScreenInfo(),
+                    route: getFocusedScreenName(),
+                    grab: {
+                        description,
+                        frames: renderedBy.map((frame) => ({
+                            name: frame.name,
+                            file: frame.file,
+                            line: frame.line,
+                            column: frame.column,
+                        })),
+                    },
+                },
+                screenshot,
+            });
+            return;
+        }
         const openFrame = getOpenFrame(renderedBy);
         const elementName = getGrabSelectionTitle(result.fiberNode, renderedBy);
         setState((prev) => ({
@@ -241,7 +274,7 @@ export const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
                 }
                 return { width, height };
             });
-        }, children: [state.isSessionEnabled && (_jsx(View, { pointerEvents: "none", style: styles.topBadge, children: _jsx(Text, { style: styles.topBadgeText, children: "Touch and move around to grab" }) })), state.isCopyBadgeVisible && (_jsx(View, { pointerEvents: "none", style: styles.topBadge, children: _jsx(Text, { style: styles.topBadgeText, children: "Element copied" }) })), !!highlightedElement && (_jsx(View, { pointerEvents: "none", style: [
+        }, children: [state.isSessionEnabled && !isCapturing && (_jsx(View, { pointerEvents: "none", style: styles.topBadge, children: _jsx(Text, { style: styles.topBadgeText, children: "Touch and move around to grab" }) })), state.isCopyBadgeVisible && !isCapturing && (_jsx(View, { pointerEvents: "none", style: styles.topBadge, children: _jsx(Text, { style: styles.topBadgeText, children: "Element copied" }) })), !isCapturing && !!highlightedElement && (_jsx(View, { pointerEvents: "none", style: [
                     styles.highlight,
                     {
                         left: highlightedElement.rect[0],

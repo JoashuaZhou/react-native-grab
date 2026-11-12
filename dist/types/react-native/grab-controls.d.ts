@@ -9,5 +9,5 @@
  * window's, since that container is a sheet rather than the whole screen whenever
  * a surface owns selection.
  */
-export declare const GrabOwnerControls: () => import("react/jsx-runtime").JSX.Element;
+export declare const GrabOwnerControls: () => import("react/jsx-runtime").JSX.Element | null;
 //# sourceMappingURL=grab-controls.d.ts.map

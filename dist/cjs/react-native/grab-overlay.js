@@ -14,9 +14,18 @@ const get_open_frame_1 = require("./get-open-frame");
 const get_rendered_by_1 = require("./get-rendered-by");
 const measure_1 = require("./measure");
 const open_1 = require("./open");
+const capture_1 = require("./review/capture");
+const store_1 = require("./review/store");
+const view_model_1 = require("./review/view-model");
 const COPY_BADGE_DURATION_MS = 1600;
+const getScreenInfo = () => ({
+    width: react_native_1.Dimensions.get("window").width,
+    height: react_native_1.Dimensions.get("window").height,
+    scale: react_native_1.PixelRatio.get(),
+});
 const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
     const isResolvedSelectionOwner = (0, containers_1.useIsResolvedGrabSelectionOwner)(ownerId);
+    const { isCapturing } = (0, grab_controller_1.useGrabControllerState)();
     const copyBadgeTimeoutRef = (0, react_1.useRef)(null);
     const windowOffsetRef = (0, react_1.useRef)([0, 0]);
     const [bounds, setBounds] = (0, react_1.useState)({ width: 0, height: 0 });
@@ -127,6 +136,30 @@ const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
             (0, description_1.getDescription)(result.fiberNode),
             (0, get_rendered_by_1.getRenderedBy)(result.fiberNode),
         ]);
+        if ((0, store_1.isReviewPaired)()) {
+            const screenshot = await (0, capture_1.captureForReview)();
+            store_1.reviewActions.openComposer({
+                mode: "create",
+                draft: {
+                    kind: "element",
+                    description: "",
+                    rect: (0, view_model_1.toWindowRect)(result.rect, windowOffsetRef.current),
+                    screen: getScreenInfo(),
+                    route: (0, containers_1.getFocusedScreenName)(),
+                    grab: {
+                        description,
+                        frames: renderedBy.map((frame) => ({
+                            name: frame.name,
+                            file: frame.file,
+                            line: frame.line,
+                            column: frame.column,
+                        })),
+                    },
+                },
+                screenshot,
+            });
+            return;
+        }
         const openFrame = (0, get_open_frame_1.getOpenFrame)(renderedBy);
         const elementName = (0, description_1.getGrabSelectionTitle)(result.fiberNode, renderedBy);
         setState((prev) => ({
@@ -244,7 +277,7 @@ const ReactNativeGrabOverlay = ({ ownerId, onPanHandlersChange, }) => {
                 }
                 return { width, height };
             });
-        }, children: [state.isSessionEnabled && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: styles.topBadge, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.topBadgeText, children: "Touch and move around to grab" }) })), state.isCopyBadgeVisible && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: styles.topBadge, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.topBadgeText, children: "Element copied" }) })), !!highlightedElement && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: [
+        }, children: [state.isSessionEnabled && !isCapturing && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: styles.topBadge, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.topBadgeText, children: "Touch and move around to grab" }) })), state.isCopyBadgeVisible && !isCapturing && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: styles.topBadge, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.topBadgeText, children: "Element copied" }) })), !isCapturing && !!highlightedElement && ((0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "none", style: [
                     styles.highlight,
                     {
                         left: highlightedElement.rect[0],

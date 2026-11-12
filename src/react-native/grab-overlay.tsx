@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Dimensions,
   NativeTouchEvent,
   PanResponder,
+  PixelRatio,
   Pressable,
   StyleSheet,
   Text,
   View,
   type GestureResponderHandlers,
 } from "react-native";
-import { getGrabSelectionOwner, useIsResolvedGrabSelectionOwner } from "./containers";
+import type { GrabFrame, ScreenInfo } from "../review-core/types";
+import {
+  getFocusedScreenName,
+  getGrabSelectionOwner,
+  useIsResolvedGrabSelectionOwner,
+} from "./containers";
 import { copyViaMetro } from "./copy";
 import { ContextMenu } from "./context-menu";
 import { GRAB_BADGE_BACKGROUND, GRAB_HIGHLIGHT_FILL, GRAB_PRIMARY } from "./grab-colors";
@@ -19,12 +26,16 @@ import {
   setGrabSelectionSessionOwner,
   showGrabSelectionMenu,
   unregisterLocalGrabSelectionController,
+  useGrabControllerState,
 } from "./grab-controller";
 import { getDescription, getGrabSelectionTitle } from "./description";
 import { getOpenFrame } from "./get-open-frame";
 import { getRenderedBy, type RenderedByFrame } from "./get-rendered-by";
 import { findNodeAtPoint, getFabricWindowOffset, measureInWindow } from "./measure";
 import { openStackFrameInEditor } from "./open";
+import { captureForReview } from "./review/capture";
+import { isReviewPaired, reviewActions } from "./review/store";
+import { toWindowRect } from "./review/view-model";
 import type { BoundingClientRect, ReactNativeFiberNode } from "./types";
 
 type GrabResult = {
@@ -41,6 +52,12 @@ type SelectedGrabResult = {
 
 const COPY_BADGE_DURATION_MS = 1600;
 
+const getScreenInfo = (): ScreenInfo => ({
+  width: Dimensions.get("window").width,
+  height: Dimensions.get("window").height,
+  scale: PixelRatio.get(),
+});
+
 export type ReactNativeGrabOverlayProps = {
   ownerId: string;
   onPanHandlersChange?: (panHandlers: GestureResponderHandlers | null) => void;
@@ -51,6 +68,7 @@ export const ReactNativeGrabOverlay = ({
   onPanHandlersChange,
 }: ReactNativeGrabOverlayProps) => {
   const isResolvedSelectionOwner = useIsResolvedGrabSelectionOwner(ownerId);
+  const { isCapturing } = useGrabControllerState();
   const copyBadgeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowOffsetRef = useRef<[number, number]>([0, 0]);
   const [bounds, setBounds] = useState({ width: 0, height: 0 });
@@ -188,6 +206,33 @@ export const ReactNativeGrabOverlay = ({
         getDescription(result.fiberNode),
         getRenderedBy(result.fiberNode),
       ]);
+
+      if (isReviewPaired()) {
+        const screenshot = await captureForReview();
+        reviewActions.openComposer({
+          mode: "create",
+          draft: {
+            kind: "element",
+            description: "",
+            rect: toWindowRect(result.rect, windowOffsetRef.current),
+            screen: getScreenInfo(),
+            route: getFocusedScreenName(),
+            grab: {
+              description,
+              frames: renderedBy.map(
+                (frame): GrabFrame => ({
+                  name: frame.name,
+                  file: frame.file,
+                  line: frame.line,
+                  column: frame.column,
+                }),
+              ),
+            },
+          },
+          screenshot,
+        });
+        return;
+      }
 
       const openFrame = getOpenFrame(renderedBy);
       const elementName = getGrabSelectionTitle(result.fiberNode, renderedBy);
@@ -337,19 +382,19 @@ export const ReactNativeGrabOverlay = ({
         });
       }}
     >
-      {state.isSessionEnabled && (
+      {state.isSessionEnabled && !isCapturing && (
         <View pointerEvents="none" style={styles.topBadge}>
           <Text style={styles.topBadgeText}>Touch and move around to grab</Text>
         </View>
       )}
 
-      {state.isCopyBadgeVisible && (
+      {state.isCopyBadgeVisible && !isCapturing && (
         <View pointerEvents="none" style={styles.topBadge}>
           <Text style={styles.topBadgeText}>Element copied</Text>
         </View>
       )}
 
-      {!!highlightedElement && (
+      {!isCapturing && !!highlightedElement && (
         <View
           pointerEvents="none"
           style={[

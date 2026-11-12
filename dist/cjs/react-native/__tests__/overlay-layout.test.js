@@ -83,6 +83,9 @@ vitest_1.vi.mock("../full-screen-overlay", () => ({ FullScreenOverlay: "Overlay"
 const controls = async () => {
     const { GrabOwnerControls } = await vitest_1.vi.importActual("../grab-controls");
     const anchor = GrabOwnerControls();
+    if (anchor === null) {
+        throw new Error("GrabOwnerControls did not render");
+    }
     const measuringView = anchor.props.children.props.children;
     const bar = measuringView.props.children;
     const position = bar.props.containerStyle[1].transform[0].translateX;
@@ -111,7 +114,7 @@ const fillsParent = {
     (0, vitest_1.it)("places the iOS toolbar below the initial window safe area", async () => {
         const bar = await controls();
         bar.layout(402, 874);
-        (0, vitest_1.expect)(bar.position()).toEqual({ x: 147, y: 134 });
+        (0, vitest_1.expect)(bar.position()).toEqual({ x: 111, y: 134 });
     });
     vitest_1.it.each([
         [0, 0],
@@ -121,24 +124,24 @@ const fillsParent = {
         const bar = await controls();
         bar.layout(width, height);
         bar.layout(402, 874);
-        (0, vitest_1.expect)(bar.position()).toEqual({ x: 147, y: 134 });
+        (0, vitest_1.expect)(bar.position()).toEqual({ x: 111, y: 134 });
     });
     (0, vitest_1.it)("keeps the Android toolbar at the existing margin", async () => {
         runtime.platform = "android";
         const bar = await controls();
         bar.layout(402, 874);
-        (0, vitest_1.expect)(bar.position()).toEqual({ x: 147, y: 72 });
+        (0, vitest_1.expect)(bar.position()).toEqual({ x: 111, y: 72 });
     });
     (0, vitest_1.it)("keeps the toolbar inside a short presented surface", async () => {
         const bar = await controls();
         bar.layout(402, 100);
-        (0, vitest_1.expect)(bar.position()).toEqual({ x: 147, y: 64 });
+        (0, vitest_1.expect)(bar.position()).toEqual({ x: 111, y: 64 });
     });
     (0, vitest_1.it)("uses the existing margin when initial metrics are unavailable", async () => {
         runtime.metrics = null;
         const bar = await controls();
         bar.layout(402, 874);
-        (0, vitest_1.expect)(bar.position()).toEqual({ x: 147, y: 72 });
+        (0, vitest_1.expect)(bar.position()).toEqual({ x: 111, y: 72 });
     });
     (0, vitest_1.it)("keeps the selection layer full size on RN 0.88", async () => {
         runtime.selecting = true;
