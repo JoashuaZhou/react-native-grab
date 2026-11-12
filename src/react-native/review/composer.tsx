@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Modal,
   Pressable,
@@ -12,67 +11,17 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 import { SCOPE_LABELS, type ItemScope } from "../../review-core/types";
-import { getDevServer } from "../dev-server";
-import { REVIEW_CODE_HEADER, type ReviewApiError } from "./api";
-import { getReviewHost, type ReviewScreenshot } from "./host";
-import {
-  PAIRING_CODE_STORAGE_KEY,
-  reviewActions,
-  useReviewState,
-  type ComposerState,
-} from "./store";
-import { canSaveComposer, thumbnailMetrics } from "./view-model";
+import { type ReviewApiError } from "./api";
+import { type ReviewScreenshot } from "./host";
+import { reviewActions, useReviewState, type ComposerState } from "./store";
+import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
+import { canSaveComposer } from "./view-model";
 
-const THUMB_WIDTH = 64;
 const NO_SCREENSHOT_HINT = "未截图：请安装包含走查截图功能的测试包";
-
-type ThumbMetrics = { width: number; height: number; scale: number };
 
 const captureSource = (screenshot: ReviewScreenshot): ImageSourcePropType => ({
   uri: `data:image/jpeg;base64,${screenshot.jpegBase64}`,
 });
-
-const storedSource = (screenshotUrl: string | null): ImageSourcePropType | null => {
-  if (!screenshotUrl) {
-    return null;
-  }
-  const code = getReviewHost()?.storage?.get(PAIRING_CODE_STORAGE_KEY);
-  if (!code) {
-    return null;
-  }
-  const root = getDevServer().url.replace(/\/+$/, "");
-  return {
-    uri: `${root}${screenshotUrl}`,
-    headers: { [REVIEW_CODE_HEADER]: code },
-  };
-};
-
-const ScreenshotThumb = ({
-  source,
-  metrics,
-  rect,
-}: {
-  source: ImageSourcePropType;
-  metrics: ThumbMetrics;
-  rect: { x: number; y: number; width: number; height: number } | null;
-}) => (
-  <View style={[styles.thumbnail, { width: metrics.width, height: metrics.height }]}>
-    <Image source={source} style={styles.thumbnailImage} resizeMode="cover" />
-    {rect !== null && (
-      <View
-        style={[
-          styles.thumbnailRect,
-          {
-            left: rect.x * metrics.scale,
-            top: rect.y * metrics.scale,
-            width: rect.width * metrics.scale,
-            height: rect.height * metrics.scale,
-          },
-        ]}
-      />
-    )}
-  </View>
-);
 
 type FormState = {
   description: string;
@@ -168,23 +117,10 @@ const ComposerSheet = ({
       ? composer.screenshot !== null
         ? captureSource(composer.screenshot)
         : null
-      : storedSource(composer.item.screenshotUrl);
-  const metrics: ThumbMetrics | null =
-    composer.mode === "create"
-      ? composer.screenshot !== null
-        ? thumbnailMetrics(composer.screenshot, THUMB_WIDTH)
-        : null
-      : composer.item.screen !== null
-        ? thumbnailMetrics(composer.item.screen, THUMB_WIDTH)
-        : source !== null
-          ? { width: THUMB_WIDTH, height: 110, scale: 1 }
-          : null;
-  const rect =
-    composer.mode === "create"
-      ? (composer.draft.rect ?? null)
-      : composer.item.screen !== null
-        ? composer.item.rect
-        : null;
+      : storedScreenshotSource(composer.item.screenshotUrl);
+  const screen =
+    composer.mode === "create" ? (composer.draft.screen ?? null) : composer.item.screen;
+  const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.backdrop}>
@@ -204,10 +140,10 @@ const ComposerSheet = ({
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>{toTitle(composer)}</Text>
 
-          {source !== null && metrics !== null ? (
-            <ScreenshotThumb source={source} metrics={metrics} rect={rect} />
-          ) : (
+          {composer.mode === "create" && source === null ? (
             <Text style={styles.hintText}>{NO_SCREENSHOT_HINT}</Text>
+          ) : (
+            <ReviewThumbnail source={source} screen={screen} rect={rect} />
           )}
 
           {composer.mode !== "reject" ? (
@@ -439,21 +375,5 @@ const styles = StyleSheet.create({
   },
   actionTextDisabled: {
     color: "rgba(255, 255, 255, 0.8)",
-  },
-  thumbnail: {
-    borderRadius: 6,
-    overflow: "hidden",
-    alignSelf: "center",
-    backgroundColor: "rgba(17, 17, 17, 0.06)",
-  },
-  thumbnailImage: {
-    width: "100%",
-    height: "100%",
-  },
-  thumbnailRect: {
-    position: "absolute",
-    borderWidth: 1.5,
-    borderColor: "#FF3B30",
-    backgroundColor: "rgba(255, 59, 48, 0.16)",
   },
 });

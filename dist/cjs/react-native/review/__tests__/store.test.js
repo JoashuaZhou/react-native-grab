@@ -346,4 +346,92 @@ const flushMicrotasks = async () => {
         (0, vitest_1.expect)(stateRequestCount()).toBe(3);
     });
 });
+(0, vitest_1.describe)("stored pairing code", () => {
+    (0, vitest_1.it)("accepts only six-digit codes", async () => {
+        const store = await loadStore();
+        for (const value of ["", "01234", "0123456", "abc123", "01234a", "12 456"]) {
+            test.storage.set(PAIRING_CODE_KEY, value);
+            (0, vitest_1.expect)(store.getStoredPairingCode()).toBe(null);
+            (0, vitest_1.expect)(store.isReviewPaired()).toBe(false);
+        }
+        test.storage.set(PAIRING_CODE_KEY, "012345");
+        (0, vitest_1.expect)(store.getStoredPairingCode()).toBe("012345");
+        (0, vitest_1.expect)(store.isReviewPaired()).toBe(true);
+    });
+    (0, vitest_1.it)("treats an undefined storage value as absent", async () => {
+        const store = await loadStore({
+            storage: {
+                get: () => undefined,
+                set: (key, value) => {
+                    test.storage.set(key, value);
+                },
+            },
+        });
+        (0, vitest_1.expect)(store.getStoredPairingCode()).toBe(null);
+        (0, vitest_1.expect)(store.isReviewPaired()).toBe(false);
+    });
+    (0, vitest_1.it)("keeps the loaded state and code on other refresh failures", async () => {
+        routeFetch({ "GET state": () => ({ body: statePayload([itemView()]) }) });
+        seedPairingCode();
+        const store = await loadStore();
+        await store.reviewActions.refresh();
+        (0, vitest_1.expect)(store.useReviewState().items).toHaveLength(1);
+        fetchMock.mockReset();
+        fetchMock.mockImplementation(async () => {
+            throw new TypeError("network down");
+        });
+        await store.reviewActions.refresh();
+        (0, vitest_1.expect)(test.storage.get(PAIRING_CODE_KEY)).toBe("012345");
+        const state = store.useReviewState();
+        (0, vitest_1.expect)(state.paired).toBe(true);
+        (0, vitest_1.expect)(state.review).not.toBeNull();
+        (0, vitest_1.expect)(state.items).toHaveLength(1);
+        (0, vitest_1.expect)(state.error).toMatchObject({ code: "network", status: 0 });
+    });
+    (0, vitest_1.it)("clears a stale code with its state on a bad_code refresh", async () => {
+        routeFetch({ "GET state": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+        seedPairingCode();
+        const store = await loadStore();
+        await store.reviewActions.refresh();
+        (0, vitest_1.expect)(test.storage.get(PAIRING_CODE_KEY)).toBe("");
+        const state = store.useReviewState();
+        (0, vitest_1.expect)(state.paired).toBe(false);
+        (0, vitest_1.expect)(state.review).toBeNull();
+        (0, vitest_1.expect)(state.items).toEqual([]);
+        (0, vitest_1.expect)(state.error).toMatchObject({ code: "bad_code", status: 401 });
+    });
+    (0, vitest_1.it)("clears a stale code with its state on a bad_code action", async () => {
+        routeFetch({
+            "POST items/1/pass": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }),
+        });
+        seedPairingCode();
+        const store = await loadStore();
+        const passed = await store.reviewActions.pass(1);
+        (0, vitest_1.expect)(passed).toBe(false);
+        (0, vitest_1.expect)(test.storage.get(PAIRING_CODE_KEY)).toBe("");
+        const state = store.useReviewState();
+        (0, vitest_1.expect)(state.paired).toBe(false);
+        (0, vitest_1.expect)(state.review).toBeNull();
+        (0, vitest_1.expect)(state.items).toEqual([]);
+        (0, vitest_1.expect)(state.error).toMatchObject({ code: "bad_code", status: 401 });
+    });
+    (0, vitest_1.it)("clears the error when a review surface opens", async () => {
+        routeFetch({ "POST pair": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+        const store = await loadStore();
+        await store.reviewActions.pair("000000");
+        (0, vitest_1.expect)(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+        store.reviewActions.openList();
+        (0, vitest_1.expect)(store.useReviewState().listVisible).toBe(true);
+        (0, vitest_1.expect)(store.useReviewState().error).toBeNull();
+        await store.reviewActions.pair("000000");
+        (0, vitest_1.expect)(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+        store.reviewActions.openComposer({
+            mode: "create",
+            draft: { kind: "page", description: "" },
+            screenshot: null,
+        });
+        (0, vitest_1.expect)(store.useReviewState().composer).not.toBeNull();
+        (0, vitest_1.expect)(store.useReviewState().error).toBeNull();
+    });
+});
 //# sourceMappingURL=store.test.js.map

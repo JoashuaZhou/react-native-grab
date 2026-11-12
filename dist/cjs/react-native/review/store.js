@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reviewActions = exports.useReviewState = exports.isReviewPaired = exports.REVIEW_POLL_INTERVAL_MS = exports.PAIRING_CODE_STORAGE_KEY = void 0;
+exports.reviewActions = exports.useReviewState = exports.isReviewPaired = exports.getStoredPairingCode = exports.REVIEW_POLL_INTERVAL_MS = exports.PAIRING_CODE_STORAGE_KEY = void 0;
 const react_1 = require("react");
 const dev_server_1 = require("../dev-server");
 const api_1 = require("./api");
@@ -35,15 +35,40 @@ const getStoredPairingCode = () => {
     if (!storage)
         return null;
     try {
-        return storage.get(exports.PAIRING_CODE_STORAGE_KEY);
+        const stored = storage.get(exports.PAIRING_CODE_STORAGE_KEY);
+        // Host storage is not trusted: only a real 6-digit string counts as
+        // paired, so cleared ("") or malformed values read as unpaired.
+        if (typeof stored !== "string" || !/^\d{6}$/.test(stored))
+            return null;
+        return stored;
     }
     catch {
         return null;
     }
 };
-const isReviewPaired = () => getStoredPairingCode() !== null;
+exports.getStoredPairingCode = getStoredPairingCode;
+const isReviewPaired = () => (0, exports.getStoredPairingCode)() !== null;
 exports.isReviewPaired = isReviewPaired;
 const toReviewApiError = (error) => error instanceof api_1.ReviewApiError ? error : new api_1.ReviewApiError("network", 0);
+// A code the server rejects with `bad_code` belongs to a previous review, so it is
+// cleared from storage and the loaded review state goes with it; the error stays
+// for the pairing view to explain.
+const clearStalePairing = (error) => {
+    try {
+        (0, host_1.getReviewHost)()?.storage?.set(exports.PAIRING_CODE_STORAGE_KEY, "");
+    }
+    catch {
+        // Nothing else can be done when the host storage fails.
+    }
+    setState((prevState) => ({
+        ...prevState,
+        paired: false,
+        review: null,
+        items: [],
+        runner: { busy: false, blocked: false },
+        error,
+    }));
+};
 const createApiForCode = (code) => (0, api_1.createReviewApi)({ baseUrl: (0, dev_server_1.getDevServer)().url, code });
 const shouldPoll = (current) => current.paired &&
     (current.listVisible ||
@@ -82,7 +107,7 @@ const fetchDeviceInfo = async () => {
     }
 };
 const runAction = async (perform) => {
-    const code = getStoredPairingCode();
+    const code = (0, exports.getStoredPairingCode)();
     if (code === null)
         return false;
     setState((prevState) => ({ ...prevState, error: null }));
@@ -90,7 +115,13 @@ const runAction = async (perform) => {
         await perform(createApiForCode(code));
     }
     catch (error) {
-        setState((prevState) => ({ ...prevState, error: toReviewApiError(error) }));
+        const apiError = toReviewApiError(error);
+        if (apiError.code === "bad_code") {
+            clearStalePairing(apiError);
+        }
+        else {
+            setState((prevState) => ({ ...prevState, error: apiError }));
+        }
         return false;
     }
     await exports.reviewActions.refresh();
@@ -111,7 +142,7 @@ exports.reviewActions = {
         return true;
     },
     refresh: async () => {
-        const code = getStoredPairingCode();
+        const code = (0, exports.getStoredPairingCode)();
         if (code === null) {
             setState((prevState) => ({ ...prevState, paired: false }));
             return;
@@ -127,11 +158,17 @@ exports.reviewActions = {
             }));
         }
         catch (error) {
-            setState((prevState) => ({ ...prevState, error: toReviewApiError(error) }));
+            const apiError = toReviewApiError(error);
+            if (apiError.code === "bad_code") {
+                clearStalePairing(apiError);
+            }
+            else {
+                setState((prevState) => ({ ...prevState, error: apiError }));
+            }
         }
     },
     openList: () => {
-        setState((prevState) => ({ ...prevState, listVisible: true }));
+        setState((prevState) => ({ ...prevState, error: null, listVisible: true }));
         // The panel always reloads from the dev server when it opens.
         if ((0, exports.isReviewPaired)()) {
             void exports.reviewActions.refresh();
@@ -141,7 +178,7 @@ exports.reviewActions = {
         setState((prevState) => ({ ...prevState, listVisible: false }));
     },
     openComposer: (composer) => {
-        setState((prevState) => ({ ...prevState, composer }));
+        setState((prevState) => ({ ...prevState, error: null, composer }));
     },
     closeComposer: () => {
         setState((prevState) => ({ ...prevState, composer: null }));

@@ -13,8 +13,8 @@ const runtime = vi.hoisted(() => ({
     paired: false,
     screenshot: {
         jpegBase64: "aGk=",
-        width: 402,
-        height: 874,
+        width: 804,
+        height: 1748,
         scale: 2,
     },
     controllerState: {
@@ -45,8 +45,9 @@ vi.mock("react", async (importOriginal) => ({
     useMemo: (factory) => factory(),
     useRef: (value) => ({ current: value }),
     useState: (initial) => {
-        if (typeof initial === "object" && initial !== null && "isSessionEnabled" in initial) {
-            runtime.state ?? (runtime.state = { ...initial, isSessionEnabled: true });
+        const resolved = typeof initial === "function" ? initial() : initial;
+        if (typeof resolved === "object" && resolved !== null && "isSessionEnabled" in resolved) {
+            runtime.state ?? (runtime.state = { ...resolved, isSessionEnabled: true });
             return [
                 runtime.state,
                 (update) => {
@@ -54,7 +55,7 @@ vi.mock("react", async (importOriginal) => ({
                 },
             ];
         }
-        return [initial, () => { }];
+        return [resolved, () => { }];
     },
 }));
 vi.mock("react-native", () => ({
@@ -159,6 +160,7 @@ vi.mock("../review/capture", () => ({
 vi.mock("../review/store", () => ({
     isReviewPaired: () => runtime.paired,
     useReviewState: () => runtime.reviewState,
+    PAIRING_CODE_STORAGE_KEY: "rnGrabReview.pairingCode",
     reviewActions: {
         openComposer: (composer) => {
             runtime.sequence.push("openComposer");
@@ -167,11 +169,14 @@ vi.mock("../review/store", () => ({
         openList: () => {
             runtime.openListCalls += 1;
         },
+        closeComposer: () => { },
+        saveComposer: async () => false,
     },
 }));
 import { GrabOwnerControls } from "../grab-controls";
 import { BAR_WIDTH, GrabControlBar } from "../grab-control-bar";
 import { ReactNativeGrabOverlay } from "../grab-overlay";
+import { ReviewComposer } from "../review/composer";
 const frame = (file, line, column, name = "Owner") => ({
     name,
     file,
@@ -213,7 +218,7 @@ beforeEach(() => {
     runtime.scale = 2;
     runtime.route = null;
     runtime.paired = false;
-    runtime.screenshot = { jpegBase64: "aGk=", width: 402, height: 874, scale: 2 };
+    runtime.screenshot = { jpegBase64: "aGk=", width: 804, height: 1748, scale: 2 };
     runtime.controllerState = {
         isMenuVisible: true,
         isCapturing: false,
@@ -378,6 +383,12 @@ describe("Toolbar", () => {
         };
         const pairedBar = controlBarOf(GrabOwnerControls());
         expect(asElement(pairedBar).props.listBadgeText).toBe("2");
+        runtime.reviewState = {
+            ...runtime.reviewState,
+            items: [deviceItem({ status: "draft" })],
+        };
+        const zeroBar = controlBarOf(GrabOwnerControls());
+        expect(asElement(zeroBar).props.listBadgeText).toBe(null);
     });
     it("captures and opens a page draft from the page slot", async () => {
         runtime.route = "Home";
@@ -403,6 +414,40 @@ describe("Toolbar", () => {
         const bar = controlBarOf(GrabOwnerControls());
         asElement(bar).props.onPressList();
         expect(runtime.openListCalls).toBe(1);
+    });
+});
+describe("Review composer", () => {
+    it("sizes the create thumbnail from the draft screen, not the screenshot pixels", () => {
+        runtime.reviewState = {
+            ...runtime.reviewState,
+            composer: {
+                mode: "create",
+                draft: {
+                    kind: "element",
+                    description: "",
+                    rect: { x: 100, y: 200, width: 80, height: 40 },
+                    screen: { width: 402, height: 874, scale: 2 },
+                    route: "Home",
+                },
+                screenshot: runtime.screenshot,
+            },
+        };
+        const modal = asElement(ReviewComposer());
+        const sheetElement = asElement(modal.props.children);
+        const sheet = asElement(sheetElement.type(sheetElement.props));
+        const children = sheet.props.children;
+        const scrollView = asElement(children[1]);
+        const sheetView = asElement(scrollView.props.children);
+        const thumbElement = asElement(sheetView.props.children[1]);
+        const thumb = asElement(thumbElement.type(thumbElement.props));
+        const boxStyle = thumb.props.style[1];
+        expect(boxStyle).toEqual({ width: 64, height: 139 });
+        const overlay = asElement(thumb.props.children[1]);
+        const overlayStyle = overlay.props.style[1];
+        expect(overlayStyle.left).toBeCloseTo(15.9204, 3);
+        expect(overlayStyle.top).toBeCloseTo(31.8408, 3);
+        expect(overlayStyle.width).toBeCloseTo(12.7363, 3);
+        expect(overlayStyle.height).toBeCloseTo(6.3682, 3);
     });
 });
 //# sourceMappingURL=review-grab.test.js.map

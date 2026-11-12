@@ -5,39 +5,13 @@ const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const types_1 = require("../../review-core/types");
-const dev_server_1 = require("../dev-server");
-const api_1 = require("./api");
-const host_1 = require("./host");
 const store_1 = require("./store");
+const thumbnail_1 = require("./thumbnail");
 const view_model_1 = require("./view-model");
-const THUMB_WIDTH = 64;
 const NO_SCREENSHOT_HINT = "未截图：请安装包含走查截图功能的测试包";
 const captureSource = (screenshot) => ({
     uri: `data:image/jpeg;base64,${screenshot.jpegBase64}`,
 });
-const storedSource = (screenshotUrl) => {
-    if (!screenshotUrl) {
-        return null;
-    }
-    const code = (0, host_1.getReviewHost)()?.storage?.get(store_1.PAIRING_CODE_STORAGE_KEY);
-    if (!code) {
-        return null;
-    }
-    const root = (0, dev_server_1.getDevServer)().url.replace(/\/+$/, "");
-    return {
-        uri: `${root}${screenshotUrl}`,
-        headers: { [api_1.REVIEW_CODE_HEADER]: code },
-    };
-};
-const ScreenshotThumb = ({ source, metrics, rect, }) => ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: [styles.thumbnail, { width: metrics.width, height: metrics.height }], children: [(0, jsx_runtime_1.jsx)(react_native_1.Image, { source: source, style: styles.thumbnailImage, resizeMode: "cover" }), rect !== null && ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: [
-                styles.thumbnailRect,
-                {
-                    left: rect.x * metrics.scale,
-                    top: rect.y * metrics.scale,
-                    width: rect.width * metrics.scale,
-                    height: rect.height * metrics.scale,
-                },
-            ] }))] }));
 const toFormState = (composer) => {
     if (composer.mode === "create") {
         const draft = composer.draft;
@@ -105,26 +79,14 @@ const ComposerSheet = ({ composer, error, }) => {
         ? composer.screenshot !== null
             ? captureSource(composer.screenshot)
             : null
-        : storedSource(composer.item.screenshotUrl);
-    const metrics = composer.mode === "create"
-        ? composer.screenshot !== null
-            ? (0, view_model_1.thumbnailMetrics)(composer.screenshot, THUMB_WIDTH)
-            : null
-        : composer.item.screen !== null
-            ? (0, view_model_1.thumbnailMetrics)(composer.item.screen, THUMB_WIDTH)
-            : source !== null
-                ? { width: THUMB_WIDTH, height: 110, scale: 1 }
-                : null;
-    const rect = composer.mode === "create"
-        ? (composer.draft.rect ?? null)
-        : composer.item.screen !== null
-            ? composer.item.rect
-            : null;
+        : (0, thumbnail_1.storedScreenshotSource)(composer.item.screenshotUrl);
+    const screen = composer.mode === "create" ? (composer.draft.screen ?? null) : composer.item.screen;
+    const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
     return ((0, jsx_runtime_1.jsxs)(react_native_1.KeyboardAvoidingView, { behavior: "padding", style: styles.backdrop, children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => {
                     if (!isSaving) {
                         store_1.reviewActions.closeComposer();
                     }
-                }, style: styles.backdropPress }), (0, jsx_runtime_1.jsx)(react_native_1.ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.sheet, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.sheetTitle, children: toTitle(composer) }), source !== null && metrics !== null ? ((0, jsx_runtime_1.jsx)(ScreenshotThumb, { source: source, metrics: metrics, rect: rect })) : ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })), composer.mode !== "reject" ? ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: [
+                }, style: styles.backdropPress }), (0, jsx_runtime_1.jsx)(react_native_1.ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.sheet, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : ((0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: [
                                                 styles.scopeChipText,
                                                 form.scope === scope && styles.scopeChipTextActive,
                                             ], children: types_1.SCOPE_LABELS[scope] }) }, scope))) }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => setForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.errorText, children: toErrorText(error) })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.actionRow, children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { disabled: isSaving, onPress: store_1.reviewActions.closeComposer, style: ({ pressed }) => [
@@ -261,22 +223,6 @@ const styles = react_native_1.StyleSheet.create({
     },
     actionTextDisabled: {
         color: "rgba(255, 255, 255, 0.8)",
-    },
-    thumbnail: {
-        borderRadius: 6,
-        overflow: "hidden",
-        alignSelf: "center",
-        backgroundColor: "rgba(17, 17, 17, 0.06)",
-    },
-    thumbnailImage: {
-        width: "100%",
-        height: "100%",
-    },
-    thumbnailRect: {
-        position: "absolute",
-        borderWidth: 1.5,
-        borderColor: "#FF3B30",
-        backgroundColor: "rgba(255, 59, 48, 0.16)",
     },
 });
 //# sourceMappingURL=composer.js.map

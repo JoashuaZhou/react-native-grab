@@ -129,6 +129,8 @@ const GrabOwnerControls = () => {
             screenshot,
         });
     }, []);
+    const awaiting = (0, view_model_1.awaitingCount)(reviewState.items);
+    const listBadgeText = !reviewState.paired ? "!" : awaiting > 0 ? String(awaiting) : null;
     // The bar leaves the output completely while a screenshot is being taken, or
     // while a review surface covers the screen, so captures stay clean.
     if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
@@ -139,7 +141,7 @@ const GrabOwnerControls = () => {
     // an owner cannot disturb the surrounding layout: that parent is free to be a
     // `gap`-spaced flex container, and absolutely positioned children are not flex
     // items.
-    (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: (0, jsx_runtime_1.jsx)(full_screen_overlay_1.FullScreenOverlay, { children: (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: (0, jsx_runtime_1.jsx)(grab_control_bar_1.GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: reviewState.paired ? String((0, view_model_1.awaitingCount)(reviewState.items)) : "!", onHidden: resetControlBarPosition, onPressHide: grab_controller_1.toggleGrabMenu, onPressList: store_1.reviewActions.openList, onPressPage: startPageReview, onPressSelect: grab_controller_1.enableGrabbing }) }) }) }));
+    (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: (0, jsx_runtime_1.jsx)(full_screen_overlay_1.FullScreenOverlay, { children: (0, jsx_runtime_1.jsx)(react_native_1.View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: (0, jsx_runtime_1.jsx)(grab_control_bar_1.GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: listBadgeText, onHidden: resetControlBarPosition, onPressHide: grab_controller_1.toggleGrabMenu, onPressList: store_1.reviewActions.openList, onPressPage: startPageReview, onPressSelect: grab_controller_1.enableGrabbing }) }) }) }));
 };
 exports.GrabOwnerControls = GrabOwnerControls;
 const styles = react_native_1.StyleSheet.create({

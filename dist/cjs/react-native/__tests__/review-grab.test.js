@@ -15,8 +15,8 @@ const runtime = vitest_1.vi.hoisted(() => ({
     paired: false,
     screenshot: {
         jpegBase64: "aGk=",
-        width: 402,
-        height: 874,
+        width: 804,
+        height: 1748,
         scale: 2,
     },
     controllerState: {
@@ -47,8 +47,9 @@ vitest_1.vi.mock("react", async (importOriginal) => ({
     useMemo: (factory) => factory(),
     useRef: (value) => ({ current: value }),
     useState: (initial) => {
-        if (typeof initial === "object" && initial !== null && "isSessionEnabled" in initial) {
-            runtime.state ?? (runtime.state = { ...initial, isSessionEnabled: true });
+        const resolved = typeof initial === "function" ? initial() : initial;
+        if (typeof resolved === "object" && resolved !== null && "isSessionEnabled" in resolved) {
+            runtime.state ?? (runtime.state = { ...resolved, isSessionEnabled: true });
             return [
                 runtime.state,
                 (update) => {
@@ -56,7 +57,7 @@ vitest_1.vi.mock("react", async (importOriginal) => ({
                 },
             ];
         }
-        return [initial, () => { }];
+        return [resolved, () => { }];
     },
 }));
 vitest_1.vi.mock("react-native", () => ({
@@ -161,6 +162,7 @@ vitest_1.vi.mock("../review/capture", () => ({
 vitest_1.vi.mock("../review/store", () => ({
     isReviewPaired: () => runtime.paired,
     useReviewState: () => runtime.reviewState,
+    PAIRING_CODE_STORAGE_KEY: "rnGrabReview.pairingCode",
     reviewActions: {
         openComposer: (composer) => {
             runtime.sequence.push("openComposer");
@@ -169,11 +171,14 @@ vitest_1.vi.mock("../review/store", () => ({
         openList: () => {
             runtime.openListCalls += 1;
         },
+        closeComposer: () => { },
+        saveComposer: async () => false,
     },
 }));
 const grab_controls_1 = require("../grab-controls");
 const grab_control_bar_1 = require("../grab-control-bar");
 const grab_overlay_1 = require("../grab-overlay");
+const composer_1 = require("../review/composer");
 const frame = (file, line, column, name = "Owner") => ({
     name,
     file,
@@ -215,7 +220,7 @@ const barSlots = (bar) => asElement(asElement(asElement(bar.props.children).prop
     runtime.scale = 2;
     runtime.route = null;
     runtime.paired = false;
-    runtime.screenshot = { jpegBase64: "aGk=", width: 402, height: 874, scale: 2 };
+    runtime.screenshot = { jpegBase64: "aGk=", width: 804, height: 1748, scale: 2 };
     runtime.controllerState = {
         isMenuVisible: true,
         isCapturing: false,
@@ -380,6 +385,12 @@ const pick = async () => {
         };
         const pairedBar = controlBarOf((0, grab_controls_1.GrabOwnerControls)());
         (0, vitest_1.expect)(asElement(pairedBar).props.listBadgeText).toBe("2");
+        runtime.reviewState = {
+            ...runtime.reviewState,
+            items: [deviceItem({ status: "draft" })],
+        };
+        const zeroBar = controlBarOf((0, grab_controls_1.GrabOwnerControls)());
+        (0, vitest_1.expect)(asElement(zeroBar).props.listBadgeText).toBe(null);
     });
     (0, vitest_1.it)("captures and opens a page draft from the page slot", async () => {
         runtime.route = "Home";
@@ -405,6 +416,40 @@ const pick = async () => {
         const bar = controlBarOf((0, grab_controls_1.GrabOwnerControls)());
         asElement(bar).props.onPressList();
         (0, vitest_1.expect)(runtime.openListCalls).toBe(1);
+    });
+});
+(0, vitest_1.describe)("Review composer", () => {
+    (0, vitest_1.it)("sizes the create thumbnail from the draft screen, not the screenshot pixels", () => {
+        runtime.reviewState = {
+            ...runtime.reviewState,
+            composer: {
+                mode: "create",
+                draft: {
+                    kind: "element",
+                    description: "",
+                    rect: { x: 100, y: 200, width: 80, height: 40 },
+                    screen: { width: 402, height: 874, scale: 2 },
+                    route: "Home",
+                },
+                screenshot: runtime.screenshot,
+            },
+        };
+        const modal = asElement((0, composer_1.ReviewComposer)());
+        const sheetElement = asElement(modal.props.children);
+        const sheet = asElement(sheetElement.type(sheetElement.props));
+        const children = sheet.props.children;
+        const scrollView = asElement(children[1]);
+        const sheetView = asElement(scrollView.props.children);
+        const thumbElement = asElement(sheetView.props.children[1]);
+        const thumb = asElement(thumbElement.type(thumbElement.props));
+        const boxStyle = thumb.props.style[1];
+        (0, vitest_1.expect)(boxStyle).toEqual({ width: 64, height: 139 });
+        const overlay = asElement(thumb.props.children[1]);
+        const overlayStyle = overlay.props.style[1];
+        (0, vitest_1.expect)(overlayStyle.left).toBeCloseTo(15.9204, 3);
+        (0, vitest_1.expect)(overlayStyle.top).toBeCloseTo(31.8408, 3);
+        (0, vitest_1.expect)(overlayStyle.width).toBeCloseTo(12.7363, 3);
+        (0, vitest_1.expect)(overlayStyle.height).toBeCloseTo(6.3682, 3);
     });
 });
 //# sourceMappingURL=review-grab.test.js.map

@@ -1,40 +1,14 @@
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from "react";
-import { Image, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, } from "react-native";
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, } from "react-native";
 import { SCOPE_LABELS } from "../../review-core/types";
-import { getDevServer } from "../dev-server";
-import { REVIEW_CODE_HEADER } from "./api";
-import { getReviewHost } from "./host";
-import { PAIRING_CODE_STORAGE_KEY, reviewActions, useReviewState, } from "./store";
-import { canSaveComposer, thumbnailMetrics } from "./view-model";
-const THUMB_WIDTH = 64;
+import { reviewActions, useReviewState } from "./store";
+import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
+import { canSaveComposer } from "./view-model";
 const NO_SCREENSHOT_HINT = "未截图：请安装包含走查截图功能的测试包";
 const captureSource = (screenshot) => ({
     uri: `data:image/jpeg;base64,${screenshot.jpegBase64}`,
 });
-const storedSource = (screenshotUrl) => {
-    if (!screenshotUrl) {
-        return null;
-    }
-    const code = getReviewHost()?.storage?.get(PAIRING_CODE_STORAGE_KEY);
-    if (!code) {
-        return null;
-    }
-    const root = getDevServer().url.replace(/\/+$/, "");
-    return {
-        uri: `${root}${screenshotUrl}`,
-        headers: { [REVIEW_CODE_HEADER]: code },
-    };
-};
-const ScreenshotThumb = ({ source, metrics, rect, }) => (_jsxs(View, { style: [styles.thumbnail, { width: metrics.width, height: metrics.height }], children: [_jsx(Image, { source: source, style: styles.thumbnailImage, resizeMode: "cover" }), rect !== null && (_jsx(View, { style: [
-                styles.thumbnailRect,
-                {
-                    left: rect.x * metrics.scale,
-                    top: rect.y * metrics.scale,
-                    width: rect.width * metrics.scale,
-                    height: rect.height * metrics.scale,
-                },
-            ] }))] }));
 const toFormState = (composer) => {
     if (composer.mode === "create") {
         const draft = composer.draft;
@@ -102,26 +76,14 @@ const ComposerSheet = ({ composer, error, }) => {
         ? composer.screenshot !== null
             ? captureSource(composer.screenshot)
             : null
-        : storedSource(composer.item.screenshotUrl);
-    const metrics = composer.mode === "create"
-        ? composer.screenshot !== null
-            ? thumbnailMetrics(composer.screenshot, THUMB_WIDTH)
-            : null
-        : composer.item.screen !== null
-            ? thumbnailMetrics(composer.item.screen, THUMB_WIDTH)
-            : source !== null
-                ? { width: THUMB_WIDTH, height: 110, scale: 1 }
-                : null;
-    const rect = composer.mode === "create"
-        ? (composer.draft.rect ?? null)
-        : composer.item.screen !== null
-            ? composer.item.rect
-            : null;
+        : storedScreenshotSource(composer.item.screenshotUrl);
+    const screen = composer.mode === "create" ? (composer.draft.screen ?? null) : composer.item.screen;
+    const rect = composer.mode === "create" ? (composer.draft.rect ?? null) : composer.item.rect;
     return (_jsxs(KeyboardAvoidingView, { behavior: "padding", style: styles.backdrop, children: [_jsx(Pressable, { onPress: () => {
                     if (!isSaving) {
                         reviewActions.closeComposer();
                     }
-                }, style: styles.backdropPress }), _jsx(ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: _jsxs(View, { style: styles.sheet, children: [_jsx(Text, { style: styles.sheetTitle, children: toTitle(composer) }), source !== null && metrics !== null ? (_jsx(ScreenshotThumb, { source: source, metrics: metrics, rect: rect })) : (_jsx(Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })), composer.mode !== "reject" ? (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), _jsx(Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), _jsx(View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => (_jsx(Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: _jsx(Text, { style: [
+                }, style: styles.backdropPress }), _jsx(ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: _jsxs(View, { style: styles.sheet, children: [_jsx(Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? (_jsx(Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : (_jsx(ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), _jsx(Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), _jsx(View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => (_jsx(Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: _jsx(Text, { style: [
                                                 styles.scopeChipText,
                                                 form.scope === scope && styles.scopeChipTextActive,
                                             ], children: SCOPE_LABELS[scope] }) }, scope))) }), _jsx(Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), _jsx(TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => setForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: toErrorText(error) })), _jsxs(View, { style: styles.actionRow, children: [_jsx(Pressable, { disabled: isSaving, onPress: reviewActions.closeComposer, style: ({ pressed }) => [
@@ -257,22 +219,6 @@ const styles = StyleSheet.create({
     },
     actionTextDisabled: {
         color: "rgba(255, 255, 255, 0.8)",
-    },
-    thumbnail: {
-        borderRadius: 6,
-        overflow: "hidden",
-        alignSelf: "center",
-        backgroundColor: "rgba(17, 17, 17, 0.06)",
-    },
-    thumbnailImage: {
-        width: "100%",
-        height: "100%",
-    },
-    thumbnailRect: {
-        position: "absolute",
-        borderWidth: 1.5,
-        borderColor: "#FF3B30",
-        backgroundColor: "rgba(255, 59, 48, 0.16)",
     },
 });
 //# sourceMappingURL=composer.js.map

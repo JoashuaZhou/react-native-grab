@@ -419,3 +419,110 @@ describe("review store", () => {
     expect(stateRequestCount()).toBe(3);
   });
 });
+
+describe("stored pairing code", () => {
+  it("accepts only six-digit codes", async () => {
+    const store = await loadStore();
+    for (const value of ["", "01234", "0123456", "abc123", "01234a", "12 456"]) {
+      test.storage.set(PAIRING_CODE_KEY, value);
+      expect(store.getStoredPairingCode()).toBe(null);
+      expect(store.isReviewPaired()).toBe(false);
+    }
+
+    test.storage.set(PAIRING_CODE_KEY, "012345");
+    expect(store.getStoredPairingCode()).toBe("012345");
+    expect(store.isReviewPaired()).toBe(true);
+  });
+
+  it("treats an undefined storage value as absent", async () => {
+    const store = await loadStore({
+      storage: {
+        get: () => undefined as unknown as string | null,
+        set: (key: string, value: string) => {
+          test.storage.set(key, value);
+        },
+      },
+    });
+
+    expect(store.getStoredPairingCode()).toBe(null);
+    expect(store.isReviewPaired()).toBe(false);
+  });
+
+  it("keeps the loaded state and code on other refresh failures", async () => {
+    routeFetch({ "GET state": () => ({ body: statePayload([itemView()]) }) });
+    seedPairingCode();
+    const store = await loadStore();
+    await store.reviewActions.refresh();
+    expect(store.useReviewState().items).toHaveLength(1);
+
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError("network down");
+    });
+
+    await store.reviewActions.refresh();
+
+    expect(test.storage.get(PAIRING_CODE_KEY)).toBe("012345");
+    const state = store.useReviewState();
+    expect(state.paired).toBe(true);
+    expect(state.review).not.toBeNull();
+    expect(state.items).toHaveLength(1);
+    expect(state.error).toMatchObject({ code: "network", status: 0 });
+  });
+
+  it("clears a stale code with its state on a bad_code refresh", async () => {
+    routeFetch({ "GET state": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+    seedPairingCode();
+    const store = await loadStore();
+
+    await store.reviewActions.refresh();
+
+    expect(test.storage.get(PAIRING_CODE_KEY)).toBe("");
+    const state = store.useReviewState();
+    expect(state.paired).toBe(false);
+    expect(state.review).toBeNull();
+    expect(state.items).toEqual([]);
+    expect(state.error).toMatchObject({ code: "bad_code", status: 401 });
+  });
+
+  it("clears a stale code with its state on a bad_code action", async () => {
+    routeFetch({
+      "POST items/1/pass": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }),
+    });
+    seedPairingCode();
+    const store = await loadStore();
+
+    const passed = await store.reviewActions.pass(1);
+
+    expect(passed).toBe(false);
+    expect(test.storage.get(PAIRING_CODE_KEY)).toBe("");
+    const state = store.useReviewState();
+    expect(state.paired).toBe(false);
+    expect(state.review).toBeNull();
+    expect(state.items).toEqual([]);
+    expect(state.error).toMatchObject({ code: "bad_code", status: 401 });
+  });
+
+  it("clears the error when a review surface opens", async () => {
+    routeFetch({ "POST pair": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+    const store = await loadStore();
+
+    await store.reviewActions.pair("000000");
+    expect(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+
+    store.reviewActions.openList();
+    expect(store.useReviewState().listVisible).toBe(true);
+    expect(store.useReviewState().error).toBeNull();
+
+    await store.reviewActions.pair("000000");
+    expect(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+
+    store.reviewActions.openComposer({
+      mode: "create",
+      draft: { kind: "page", description: "" },
+      screenshot: null,
+    });
+    expect(store.useReviewState().composer).not.toBeNull();
+    expect(store.useReviewState().error).toBeNull();
+  });
+});

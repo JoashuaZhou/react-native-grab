@@ -173,6 +173,9 @@ export const GrabOwnerControls = () => {
     });
   }, []);
 
+  const awaiting = awaitingCount(reviewState.items);
+  const listBadgeText = !reviewState.paired ? "!" : awaiting > 0 ? String(awaiting) : null;
+
   // The bar leaves the output completely while a screenshot is being taken, or
   // while a review surface covers the screen, so captures stay clean.
   if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
@@ -194,7 +197,7 @@ export const GrabOwnerControls = () => {
             dragHandlePanHandlers={dragHandlePanResponder.panHandlers}
             isSessionEnabled={state.selectionSessionOwnerId !== null}
             isVisible={isControlBarVisible}
-            listBadgeText={reviewState.paired ? String(awaitingCount(reviewState.items)) : "!"}
+            listBadgeText={listBadgeText}
             onHidden={resetControlBarPosition}
             onPressHide={toggleGrabMenu}
             onPressList={reviewActions.openList}

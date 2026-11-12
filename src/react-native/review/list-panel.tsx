@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Alert,
-  Image,
   Linking,
   Modal,
   Pressable,
@@ -10,42 +9,33 @@ import {
   Text,
   TextInput,
   View,
-  type ImageSourcePropType,
 } from "react-native";
 import type { DeviceItemView } from "../../review-core/types";
-import { getDevServer } from "../dev-server";
-import { REVIEW_CODE_HEADER, type ReviewApiError } from "./api";
-import { getReviewHost } from "./host";
-import { PAIRING_CODE_STORAGE_KEY, reviewActions, useReviewState } from "./store";
-import { footerState, groupItemsByStatus, revertHint, thumbnailMetrics } from "./view-model";
+import { type ReviewApiError } from "./api";
+import { reviewActions, useReviewState } from "./store";
+import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
+import { footerState, groupItemsByStatus, revertHint } from "./view-model";
 
-const THUMB_WIDTH = 64;
+export const PAIRING_STALE_MESSAGE = "走查已更换，请输入新的配对码";
+export const PAIRING_WRONG_CODE_MESSAGE = "配对码不正确，请重试";
+
 const BUSY_BANNER = "agent 修复中…";
 const BLOCKED_BANNER = "agent 运行异常，请联系工程师处理（rn-grab-review retry）";
 const REVERT_CONFIRM_MESSAGE = "撤销后这条的代码改动会被还原，确定吗？";
 const REVERT_CONFLICT_ERROR = "撤销失败：和后面的改动冲突，请联系工程师处理";
 
-const thumbSource = (screenshotUrl: string | null): ImageSourcePropType | null => {
-  if (!screenshotUrl) {
-    return null;
-  }
-  const code = getReviewHost()?.storage?.get(PAIRING_CODE_STORAGE_KEY);
-  if (!code) {
-    return null;
-  }
-  const root = getDevServer().url.replace(/\/+$/, "");
-  return {
-    uri: `${root}${screenshotUrl}`,
-    headers: { [REVIEW_CODE_HEADER]: code },
-  };
-};
-
-const pairingErrorText = (error: ReviewApiError | null): string | null => {
+// `bad_code` after the view's own pair attempt means the typed code is wrong;
+// the same error without an attempt comes from a stale stored code (the store
+// clears it and keeps the error for this view to explain).
+export const pairingErrorText = (
+  error: ReviewApiError | null,
+  hasPairAttempt: boolean,
+): string | null => {
   if (error === null) {
     return null;
   }
   if (error.code === "bad_code") {
-    return "配对码不正确，请重试";
+    return hasPairAttempt ? PAIRING_WRONG_CODE_MESSAGE : PAIRING_STALE_MESSAGE;
   }
   if (error.code === "locked") {
     return "失败次数过多，请重启 Metro 后重试";
@@ -132,39 +122,13 @@ const ItemRow = ({
   onRevert,
   pending,
 }: ItemRowProps) => {
-  const source = thumbSource(item.screenshotUrl);
-  const metrics =
-    item.screen !== null
-      ? thumbnailMetrics(item.screen, THUMB_WIDTH)
-      : { width: THUMB_WIDTH, height: 110, scale: 1 };
-  const rect = item.screen !== null ? item.rect : null;
+  const source = storedScreenshotSource(item.screenshotUrl);
   const hint = revertHint(item, busy);
   const reply = latestReplyText(item);
 
   return (
     <View style={styles.itemRow}>
-      {source !== null ? (
-        <View style={[styles.thumbnail, { width: metrics.width, height: metrics.height }]}>
-          <Image source={source} style={styles.thumbnailImage} resizeMode="cover" />
-          {rect !== null && (
-            <View
-              style={[
-                styles.thumbnailRect,
-                {
-                  left: rect.x * metrics.scale,
-                  top: rect.y * metrics.scale,
-                  width: rect.width * metrics.scale,
-                  height: rect.height * metrics.scale,
-                },
-              ]}
-            />
-          )}
-        </View>
-      ) : (
-        <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-          <Text style={styles.thumbnailPlaceholderText}>无截图</Text>
-        </View>
-      )}
+      <ReviewThumbnail source={source} screen={item.screen} rect={item.rect} />
 
       <View style={styles.itemBody}>
         <Text style={styles.itemNo}>#{item.no}</Text>
@@ -206,12 +170,14 @@ const ItemRow = ({
 const PairingView = ({ error }: { error: ReviewApiError | null }) => {
   const [code, setCode] = useState("");
   const [isPairing, setIsPairing] = useState(false);
+  const [hasPairAttempt, setHasPairAttempt] = useState(false);
 
   const handlePair = async () => {
     if (isPairing || code.length !== 6) {
       return;
     }
     setIsPairing(true);
+    setHasPairAttempt(true);
     await reviewActions.pair(code);
     setIsPairing(false);
   };
@@ -227,8 +193,8 @@ const PairingView = ({ error }: { error: ReviewApiError | null }) => {
         style={styles.pairingInput}
         value={code}
       />
-      {pairingErrorText(error) !== null && (
-        <Text style={styles.errorText}>{pairingErrorText(error)}</Text>
+      {pairingErrorText(error, hasPairAttempt) !== null && (
+        <Text style={styles.errorText}>{pairingErrorText(error, hasPairAttempt)}</Text>
       )}
       <ActionButton
         disabled={isPairing || code.length !== 6}
@@ -444,31 +410,6 @@ const styles = StyleSheet.create({
     color: "#8A8A8A",
     fontSize: 11,
     width: "100%",
-  },
-  thumbnail: {
-    borderRadius: 6,
-    overflow: "hidden",
-    backgroundColor: "rgba(17, 17, 17, 0.06)",
-  },
-  thumbnailImage: {
-    width: "100%",
-    height: "100%",
-  },
-  thumbnailRect: {
-    position: "absolute",
-    borderWidth: 1.5,
-    borderColor: "#FF3B30",
-    backgroundColor: "rgba(255, 59, 48, 0.16)",
-  },
-  thumbnailPlaceholder: {
-    width: THUMB_WIDTH,
-    height: 110,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  thumbnailPlaceholderText: {
-    color: "#8A8A8A",
-    fontSize: 11,
   },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,

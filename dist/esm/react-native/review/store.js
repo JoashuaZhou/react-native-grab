@@ -27,12 +27,17 @@ const subscribe = (listener) => {
     };
 };
 const getSnapshot = () => state;
-const getStoredPairingCode = () => {
+export const getStoredPairingCode = () => {
     const storage = getReviewHost()?.storage;
     if (!storage)
         return null;
     try {
-        return storage.get(PAIRING_CODE_STORAGE_KEY);
+        const stored = storage.get(PAIRING_CODE_STORAGE_KEY);
+        // Host storage is not trusted: only a real 6-digit string counts as
+        // paired, so cleared ("") or malformed values read as unpaired.
+        if (typeof stored !== "string" || !/^\d{6}$/.test(stored))
+            return null;
+        return stored;
     }
     catch {
         return null;
@@ -40,6 +45,25 @@ const getStoredPairingCode = () => {
 };
 export const isReviewPaired = () => getStoredPairingCode() !== null;
 const toReviewApiError = (error) => error instanceof ReviewApiError ? error : new ReviewApiError("network", 0);
+// A code the server rejects with `bad_code` belongs to a previous review, so it is
+// cleared from storage and the loaded review state goes with it; the error stays
+// for the pairing view to explain.
+const clearStalePairing = (error) => {
+    try {
+        getReviewHost()?.storage?.set(PAIRING_CODE_STORAGE_KEY, "");
+    }
+    catch {
+        // Nothing else can be done when the host storage fails.
+    }
+    setState((prevState) => ({
+        ...prevState,
+        paired: false,
+        review: null,
+        items: [],
+        runner: { busy: false, blocked: false },
+        error,
+    }));
+};
 const createApiForCode = (code) => createReviewApi({ baseUrl: getDevServer().url, code });
 const shouldPoll = (current) => current.paired &&
     (current.listVisible ||
@@ -85,7 +109,13 @@ const runAction = async (perform) => {
         await perform(createApiForCode(code));
     }
     catch (error) {
-        setState((prevState) => ({ ...prevState, error: toReviewApiError(error) }));
+        const apiError = toReviewApiError(error);
+        if (apiError.code === "bad_code") {
+            clearStalePairing(apiError);
+        }
+        else {
+            setState((prevState) => ({ ...prevState, error: apiError }));
+        }
         return false;
     }
     await reviewActions.refresh();
@@ -122,11 +152,17 @@ export const reviewActions = {
             }));
         }
         catch (error) {
-            setState((prevState) => ({ ...prevState, error: toReviewApiError(error) }));
+            const apiError = toReviewApiError(error);
+            if (apiError.code === "bad_code") {
+                clearStalePairing(apiError);
+            }
+            else {
+                setState((prevState) => ({ ...prevState, error: apiError }));
+            }
         }
     },
     openList: () => {
-        setState((prevState) => ({ ...prevState, listVisible: true }));
+        setState((prevState) => ({ ...prevState, error: null, listVisible: true }));
         // The panel always reloads from the dev server when it opens.
         if (isReviewPaired()) {
             void reviewActions.refresh();
@@ -136,7 +172,7 @@ export const reviewActions = {
         setState((prevState) => ({ ...prevState, listVisible: false }));
     },
     openComposer: (composer) => {
-        setState((prevState) => ({ ...prevState, composer }));
+        setState((prevState) => ({ ...prevState, error: null, composer }));
     },
     closeComposer: () => {
         setState((prevState) => ({ ...prevState, composer: null }));

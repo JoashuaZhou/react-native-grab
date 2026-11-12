@@ -1,39 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReviewListPanel = void 0;
+exports.ReviewListPanel = exports.pairingErrorText = exports.PAIRING_WRONG_CODE_MESSAGE = exports.PAIRING_STALE_MESSAGE = void 0;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
-const dev_server_1 = require("../dev-server");
-const api_1 = require("./api");
-const host_1 = require("./host");
 const store_1 = require("./store");
+const thumbnail_1 = require("./thumbnail");
 const view_model_1 = require("./view-model");
-const THUMB_WIDTH = 64;
+exports.PAIRING_STALE_MESSAGE = "走查已更换，请输入新的配对码";
+exports.PAIRING_WRONG_CODE_MESSAGE = "配对码不正确，请重试";
 const BUSY_BANNER = "agent 修复中…";
 const BLOCKED_BANNER = "agent 运行异常，请联系工程师处理（rn-grab-review retry）";
 const REVERT_CONFIRM_MESSAGE = "撤销后这条的代码改动会被还原，确定吗？";
 const REVERT_CONFLICT_ERROR = "撤销失败：和后面的改动冲突，请联系工程师处理";
-const thumbSource = (screenshotUrl) => {
-    if (!screenshotUrl) {
-        return null;
-    }
-    const code = (0, host_1.getReviewHost)()?.storage?.get(store_1.PAIRING_CODE_STORAGE_KEY);
-    if (!code) {
-        return null;
-    }
-    const root = (0, dev_server_1.getDevServer)().url.replace(/\/+$/, "");
-    return {
-        uri: `${root}${screenshotUrl}`,
-        headers: { [api_1.REVIEW_CODE_HEADER]: code },
-    };
-};
-const pairingErrorText = (error) => {
+// `bad_code` after the view's own pair attempt means the typed code is wrong;
+// the same error without an attempt comes from a stale stored code (the store
+// clears it and keeps the error for this view to explain).
+const pairingErrorText = (error, hasPairAttempt) => {
     if (error === null) {
         return null;
     }
     if (error.code === "bad_code") {
-        return "配对码不正确，请重试";
+        return hasPairAttempt ? exports.PAIRING_WRONG_CODE_MESSAGE : exports.PAIRING_STALE_MESSAGE;
     }
     if (error.code === "locked") {
         return "失败次数过多，请重启 Metro 后重试";
@@ -43,6 +31,7 @@ const pairingErrorText = (error) => {
     }
     return `配对失败（${error.code}），请重试`;
 };
+exports.pairingErrorText = pairingErrorText;
 const actionErrorText = (error) => {
     if (error === null) {
         return null;
@@ -73,35 +62,25 @@ const ActionButton = ({ disabled, label, onPress, primary, }) => ((0, jsx_runtim
             disabled && styles.actionTextDisabled,
         ], children: label }) }));
 const ItemRow = ({ busy, item, onDelete, onEdit, onPass, onReject, onRevert, pending, }) => {
-    const source = thumbSource(item.screenshotUrl);
-    const metrics = item.screen !== null
-        ? (0, view_model_1.thumbnailMetrics)(item.screen, THUMB_WIDTH)
-        : { width: THUMB_WIDTH, height: 110, scale: 1 };
-    const rect = item.screen !== null ? item.rect : null;
+    const source = (0, thumbnail_1.storedScreenshotSource)(item.screenshotUrl);
     const hint = (0, view_model_1.revertHint)(item, busy);
     const reply = latestReplyText(item);
-    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemRow, children: [source !== null ? ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: [styles.thumbnail, { width: metrics.width, height: metrics.height }], children: [(0, jsx_runtime_1.jsx)(react_native_1.Image, { source: source, style: styles.thumbnailImage, resizeMode: "cover" }), rect !== null && ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: [
-                            styles.thumbnailRect,
-                            {
-                                left: rect.x * metrics.scale,
-                                top: rect.y * metrics.scale,
-                                width: rect.width * metrics.scale,
-                                height: rect.height * metrics.scale,
-                            },
-                        ] }))] })) : ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: [styles.thumbnail, styles.thumbnailPlaceholder], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.thumbnailPlaceholderText, children: "\u65E0\u622A\u56FE" }) })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemBody, children: [(0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemNo, children: ["#", item.no] }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && ((0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemReply, numberOfLines: 3, children: ["\u56DE\u590D\uFF1A", reply] })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemActions, children: [item.actions.includes("edit") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
+    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemRow, children: [(0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemBody, children: [(0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemNo, children: ["#", item.no] }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && ((0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemReply, numberOfLines: 3, children: ["\u56DE\u590D\uFF1A", reply] })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemActions, children: [item.actions.includes("edit") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
 };
 const PairingView = ({ error }) => {
     const [code, setCode] = (0, react_1.useState)("");
     const [isPairing, setIsPairing] = (0, react_1.useState)(false);
+    const [hasPairAttempt, setHasPairAttempt] = (0, react_1.useState)(false);
     const handlePair = async () => {
         if (isPairing || code.length !== 6) {
             return;
         }
         setIsPairing(true);
+        setHasPairAttempt(true);
         await store_1.reviewActions.pair(code);
         setIsPairing(false);
     };
-    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.centered, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.pairingTitle, children: "\u8FDE\u63A5\u8D70\u67E5" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { keyboardType: "number-pad", maxLength: 6, onChangeText: (text) => setCode(text.replace(/\D/g, "").slice(0, 6)), placeholder: "\u8BF7\u8F93\u5165 6 \u4F4D\u914D\u5BF9\u7801", style: styles.pairingInput, value: code }), pairingErrorText(error) !== null && ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.errorText, children: pairingErrorText(error) })), (0, jsx_runtime_1.jsx)(ActionButton, { disabled: isPairing || code.length !== 6, label: isPairing ? "配对中…" : "配对", onPress: () => void handlePair(), primary: true })] }));
+    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.centered, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.pairingTitle, children: "\u8FDE\u63A5\u8D70\u67E5" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { keyboardType: "number-pad", maxLength: 6, onChangeText: (text) => setCode(text.replace(/\D/g, "").slice(0, 6)), placeholder: "\u8BF7\u8F93\u5165 6 \u4F4D\u914D\u5BF9\u7801", style: styles.pairingInput, value: code }), (0, exports.pairingErrorText)(error, hasPairAttempt) !== null && ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.errorText, children: (0, exports.pairingErrorText)(error, hasPairAttempt) })), (0, jsx_runtime_1.jsx)(ActionButton, { disabled: isPairing || code.length !== 6, label: isPairing ? "配对中…" : "配对", onPress: () => void handlePair(), primary: true })] }));
 };
 const ReviewListPanel = () => {
     const { error, items, listVisible, paired, review, runner } = (0, store_1.useReviewState)();
@@ -224,31 +203,6 @@ const styles = react_native_1.StyleSheet.create({
         color: "#8A8A8A",
         fontSize: 11,
         width: "100%",
-    },
-    thumbnail: {
-        borderRadius: 6,
-        overflow: "hidden",
-        backgroundColor: "rgba(17, 17, 17, 0.06)",
-    },
-    thumbnailImage: {
-        width: "100%",
-        height: "100%",
-    },
-    thumbnailRect: {
-        position: "absolute",
-        borderWidth: 1.5,
-        borderColor: "#FF3B30",
-        backgroundColor: "rgba(255, 59, 48, 0.16)",
-    },
-    thumbnailPlaceholder: {
-        width: THUMB_WIDTH,
-        height: 110,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    thumbnailPlaceholderText: {
-        color: "#8A8A8A",
-        fontSize: 11,
     },
     footer: {
         borderTopWidth: react_native_1.StyleSheet.hairlineWidth,

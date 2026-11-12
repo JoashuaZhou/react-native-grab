@@ -68,15 +68,15 @@ const printStatus = async (options = {}) => {
 exports.printStatus = printStatus;
 const formatRect = (item) => {
     if (item.rect === null) {
-        return "矩形：无";
+        return "矩形（pt，相对屏幕左上角）：无";
     }
-    return `矩形：x ${item.rect.x}，y ${item.rect.y}，宽 ${item.rect.width}，高 ${item.rect.height}`;
+    return `矩形（pt，相对屏幕左上角）：x ${item.rect.x}，y ${item.rect.y}，宽 ${item.rect.width}，高 ${item.rect.height}`;
 };
 const formatScreen = (item) => {
     if (item.screen === null) {
         return "屏幕：无";
     }
-    return `屏幕：${item.screen.width}×${item.screen.height}（${item.screen.scale}x）`;
+    return `屏幕：${item.screen.width}×${item.screen.height} pt（截图与屏幕等比缩放）`;
 };
 const formatRounds = (item) => {
     return item.rounds.map((round, index) => {

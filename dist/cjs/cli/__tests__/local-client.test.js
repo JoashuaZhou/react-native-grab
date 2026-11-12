@@ -119,7 +119,9 @@ const sendJson = (res, status, payload) => {
         (0, vitest_1.expect)(output).toContain("/page/home");
         (0, vitest_1.expect)(output).toContain("https://www.figma.com/file/x?node-id=1");
         (0, vitest_1.expect)(output).toContain("200");
-        (0, vitest_1.expect)(output).toContain("1170×2532");
+        (0, vitest_1.expect)(output).toContain("矩形（pt，相对屏幕左上角）：x 0，y 100，宽 200，高 80");
+        (0, vitest_1.expect)(output).toContain("屏幕：1170×2532 pt（截图与屏幕等比缩放）");
+        (0, vitest_1.expect)(output).not.toContain("（3x）");
         (0, vitest_1.expect)(output).toContain(copied);
         (0, vitest_1.expect)(output).toContain("标题字号应为 16");
         (0, vitest_1.expect)(output).toContain("间距仍不对");

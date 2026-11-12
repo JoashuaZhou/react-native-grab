@@ -29,6 +29,7 @@ export type ReviewStoreState = {
     composer: ComposerState | null;
     error: ReviewApiError | null;
 };
+export declare const getStoredPairingCode: () => string | null;
 export declare const isReviewPaired: () => boolean;
 export declare const useReviewState: () => ReviewStoreState;
 export declare const reviewActions: {

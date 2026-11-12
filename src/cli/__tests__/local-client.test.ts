@@ -137,7 +137,9 @@ describe("showItem", () => {
     expect(output).toContain("/page/home");
     expect(output).toContain("https://www.figma.com/file/x?node-id=1");
     expect(output).toContain("200");
-    expect(output).toContain("1170×2532");
+    expect(output).toContain("矩形（pt，相对屏幕左上角）：x 0，y 100，宽 200，高 80");
+    expect(output).toContain("屏幕：1170×2532 pt（截图与屏幕等比缩放）");
+    expect(output).not.toContain("（3x）");
     expect(output).toContain(copied);
     expect(output).toContain("标题字号应为 16");
     expect(output).toContain("间距仍不对");

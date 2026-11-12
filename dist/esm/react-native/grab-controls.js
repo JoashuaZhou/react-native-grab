@@ -126,6 +126,8 @@ export const GrabOwnerControls = () => {
             screenshot,
         });
     }, []);
+    const awaiting = awaitingCount(reviewState.items);
+    const listBadgeText = !reviewState.paired ? "!" : awaiting > 0 ? String(awaiting) : null;
     // The bar leaves the output completely while a screenshot is being taken, or
     // while a review surface covers the screen, so captures stay clean.
     if (state.isCapturing || reviewState.listVisible || reviewState.composer !== null) {
@@ -136,7 +138,7 @@ export const GrabOwnerControls = () => {
     // an owner cannot disturb the surrounding layout: that parent is free to be a
     // `gap`-spaced flex container, and absolutely positioned children are not flex
     // items.
-    _jsx(View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: _jsx(FullScreenOverlay, { children: _jsx(View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: _jsx(GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: reviewState.paired ? String(awaitingCount(reviewState.items)) : "!", onHidden: resetControlBarPosition, onPressHide: toggleGrabMenu, onPressList: reviewActions.openList, onPressPage: startPageReview, onPressSelect: enableGrabbing }) }) }) }));
+    _jsx(View, { pointerEvents: "box-none", style: styles.overlayAnchor, children: _jsx(FullScreenOverlay, { children: _jsx(View, { pointerEvents: "box-none", style: styles.overlayRoot, onLayout: handleLayout, children: _jsx(GrabControlBar, { containerStyle: containerStyle, dragHandlePanHandlers: dragHandlePanResponder.panHandlers, isSessionEnabled: state.selectionSessionOwnerId !== null, isVisible: isControlBarVisible, listBadgeText: listBadgeText, onHidden: resetControlBarPosition, onPressHide: toggleGrabMenu, onPressList: reviewActions.openList, onPressPage: startPageReview, onPressSelect: enableGrabbing }) }) }) }));
 };
 const styles = StyleSheet.create({
     overlayAnchor: {
