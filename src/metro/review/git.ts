@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 
 export const REVIEW_BRANCH_PREFIX = "fix/design-review-";
 
@@ -227,6 +227,30 @@ export const createGit = (run: GitRunner = defaultRunner) => {
     throw fail(args, cwd, result);
   };
 
+  const saveLeftovers = async (cwd: string, patchFile: string): Promise<boolean> => {
+    if (await isClean(cwd)) {
+      return false;
+    }
+    const addArgs = ["add", "-A"];
+    const added = await run(addArgs, cwd);
+    if (added.code !== 0) {
+      throw fail(addArgs, cwd, added);
+    }
+    const diffArgs = ["diff", "--cached", "--binary"];
+    const diff = await run(diffArgs, cwd);
+    if (diff.code !== 0) {
+      throw fail(diffArgs, cwd, diff);
+    }
+    mkdirSync(dirname(patchFile), { recursive: true });
+    writeFileSync(patchFile, diff.stdout, "utf8");
+    const resetArgs = ["reset", "--hard"];
+    const reset = await run(resetArgs, cwd);
+    if (reset.code !== 0) {
+      throw fail(resetArgs, cwd, reset);
+    }
+    return true;
+  };
+
   return {
     isClean,
     isBasePushed,
@@ -235,6 +259,7 @@ export const createGit = (run: GitRunner = defaultRunner) => {
     verifyItemCommits,
     revertCommits,
     hasNetDiff,
+    saveLeftovers,
   };
 };
 

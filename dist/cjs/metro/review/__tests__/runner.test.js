@@ -560,6 +560,62 @@ const readStoredReview = (dir) => JSON.parse((0, node_fs_1.readFileSync)((0, nod
         (0, vitest_1.expect)(stored.items[0].status).toBe("queued");
         (0, vitest_1.expect)(stored.items[0].lastError).toBe("Metro 重启时该条仍在修复中");
     });
+    (0, vitest_1.it)("saves worktree leftovers into a patch before spawning the agent run", async () => {
+        const dir = (0, node_fs_1.mkdtempSync)((0, node_path_1.join)(root, "module-leftovers-"));
+        const worktree = (0, node_path_1.join)(root, "leftover-worktree");
+        const probe = (0, node_path_1.join)(root, "probe.js");
+        const gitIn = (cwd, ...args) => {
+            const result = (0, node_child_process_1.spawnSync)("git", args, { cwd, encoding: "utf8" });
+            if (result.status !== 0) {
+                throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${result.stderr}`);
+            }
+            return result.stdout;
+        };
+        (0, node_fs_1.mkdirSync)(worktree, { recursive: true });
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(worktree, "file.txt"), "line: base\n", "utf8");
+        gitIn(worktree, "init", "-q", "-b", "base");
+        gitIn(worktree, "config", "user.email", "review@react-native-grab.test");
+        gitIn(worktree, "config", "user.name", "Review Test");
+        gitIn(worktree, "add", ".");
+        gitIn(worktree, "commit", "-qm", "base");
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(worktree, "file.txt"), "line: leftover\n", "utf8");
+        (0, node_fs_1.writeFileSync)(probe, [
+            "#!/usr/bin/env node",
+            "const fs = require('node:fs');",
+            "const cp = require('node:child_process');",
+            "const leftovers = process.env.RN_GRAB_TEST_LEFTOVERS;",
+            "const worktree = process.env.RN_GRAB_TEST_WORKTREE;",
+            "const files = fs.existsSync(leftovers) ? fs.readdirSync(leftovers) : [];",
+            "const status = cp.spawnSync('git', ['status', '--porcelain'], { cwd: worktree });",
+            'if (files.length !== 1 || String(status.stdout).trim() !== "") {',
+            "  console.error('probe failed: leftovers=' + files.length + ' status=' + status.stdout);",
+            "  process.exit(3);",
+            "}",
+            "console.log('PROBE_OK');",
+            "",
+        ].join("\n"), "utf8");
+        (0, node_fs_1.chmodSync)(probe, 0o755);
+        process.env.RN_GRAB_TEST_LEFTOVERS = (0, node_path_1.join)(dir, "leftovers");
+        process.env.RN_GRAB_TEST_WORKTREE = worktree;
+        try {
+            store_1.ReviewStore.create(dir, { ...(0, fixtures_1.fixing)(), codemakerBin: probe, worktree });
+            const reviewModule = (0, module_1.createReviewModule)(dir);
+            await reviewModule.runner.whenIdle();
+            const log = readLog(dir);
+            (0, vitest_1.expect)(log).not.toContain("exitCode=3");
+            (0, vitest_1.expect)(log).toContain("exitCode=0");
+            const entries = (0, node_fs_1.readdirSync)((0, node_path_1.join)(dir, "leftovers"));
+            (0, vitest_1.expect)(entries).toHaveLength(1);
+            (0, vitest_1.expect)(entries[0]).toMatch(/^\d{8}-\d{6}\.patch$/);
+            (0, vitest_1.expect)(log).toContain((0, node_path_1.join)(dir, "leftovers", entries[0]));
+            (0, vitest_1.expect)(gitIn(worktree, "status", "--porcelain").trim()).toBe("");
+            (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(dir, "leftovers", entries[0]), "utf8")).toContain("line: leftover");
+        }
+        finally {
+            delete process.env.RN_GRAB_TEST_LEFTOVERS;
+            delete process.env.RN_GRAB_TEST_WORKTREE;
+        }
+    });
 });
 const makeMiddleware = () => {
     const base = vitest_1.vi.fn();

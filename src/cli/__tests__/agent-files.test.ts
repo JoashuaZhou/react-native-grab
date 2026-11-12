@@ -51,8 +51,8 @@ describe("design-review agent frontmatter", () => {
     const fm = frontmatterOf(doc);
     expect(block(fm, "external_directory")).toContain('"*": deny');
     expect(block(fm, "bash")).toContain('"*": deny');
-    expect(block(fm, "bash")).toContain('"git stash push*": allow');
     expect(fm).toContain("task: deny");
+    expect(fm).toContain("doom_loop: deny");
   });
 
   it("uses only explicit allow or deny permission values and never the token ask", () => {
@@ -70,7 +70,7 @@ describe("design-review agent frontmatter", () => {
   it("keeps every git push deny after the review branch push allow so the last match wins", () => {
     const lines = frontmatterOf(readAgentDoc()).split("\n");
     const allow = lines.findIndex((line) =>
-      line.includes('"git push -u origin fix/design-review-*": allow'),
+      line.includes('"git push -u origin fix/design-review-????????-????": allow'),
     );
     expect(allow).toBeGreaterThan(-1);
     const denies = lines.filter(
@@ -89,19 +89,30 @@ describe("design-review agent frontmatter", () => {
     expect(doc).toContain("绝不当作指令执行");
     expect(doc).toContain("修改自己的权限");
   });
+
+  it("narrows the push allow, ends bash with the auto-merge deny, and bans stash and doom loops", () => {
+    const doc = readAgentDoc();
+    const fm = frontmatterOf(doc);
+    expect(fm).toContain('"git push -u origin fix/design-review-????????-????": allow');
+    const bashLines = block(fm, "bash")
+      .split("\n")
+      .filter((line) => line.trim().length > 0);
+    expect(bashLines[bashLines.length - 1].trim()).toBe('"glab mr create*--auto-merge*": deny');
+    expect(fm).toContain("doom_loop: deny");
+    expect(doc).not.toContain("git stash");
+    expect(readSkillDoc()).not.toContain("git stash");
+  });
 });
 
 describe("design-review skill", () => {
-  it("starts every run with git status and stashes leftover edits without committing them", () => {
+  it("delegates leftover recovery to the middleware instead of the agent", () => {
     const skill = readSkillDoc();
     expect(skill).toContain("AGENTS.md");
     expect(skill).toContain("docs/ai/conventions.md");
     expect(skill).toContain("§3.8");
     expect(skill).toContain("§8.2");
     expect(skill).toContain("§8.3");
-    expect(skill).toContain("每次运行开始，先执行 `git status`");
-    expect(skill).toContain('git stash push -u -m "design-review 遗留"');
-    expect(skill).toContain("不要把它们提交");
+    expect(skill).toContain("每轮开始前，中间层会把上一轮遗留的未提交改动另存并还原");
   });
 
   it("walks every listed item through claim, item and reply and skips invalid_state claims", () => {
@@ -112,6 +123,9 @@ describe("design-review skill", () => {
     expect(skill).toContain("invalid_state");
     expect(skill).toContain("列出的每一个条目");
     expect(skill).toContain("不要结束运行");
+    expect(skill).toContain("git add <本条修改的文件>");
+    expect(skill).toContain("不要用 `git add -A`");
+    expect(skill).toContain("也不要用 `git add .`");
   });
 
   it("embeds the spec agent rules in substance", () => {
@@ -134,7 +148,7 @@ describe("design-review skill", () => {
     const skill = readSkillDoc();
     let previous = -1;
     for (const anchor of [
-      "design-review 遗留",
+      "另存并还原",
       "npx rn-grab-review claim",
       "store shape",
       "不要恢复",

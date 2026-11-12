@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -281,6 +283,52 @@ describe("createGit with the default runner", () => {
     const git = createGit();
 
     expect(await git.isBasePushed(repo, "base")).toBe(false);
+  });
+});
+
+describe("saveLeftovers", () => {
+  it("returns false on a clean worktree without creating a patch", async () => {
+    const repo = makeRepo();
+    const git = createGit();
+    const patchFile = join(root, "leftovers", "local-20261112-090000.patch");
+
+    expect(await git.saveLeftovers(repo, patchFile)).toBe(false);
+    expect(existsSync(patchFile)).toBe(false);
+    expect(existsSync(join(root, "leftovers"))).toBe(false);
+  });
+
+  it("saves tracked, new and binary changes, preserves ignored files and restores via git apply", async () => {
+    const repo = makeRepo();
+    const git = createGit();
+    mkdirSync(join(repo, ".git", "info"), { recursive: true });
+    appendFileSync(join(repo, ".git", "info", "exclude"), "\n.rn-grab-review/\n", "utf8");
+
+    writeFileSync(join(repo, "file.txt"), "line: dirty\n", "utf8");
+    writeFileSync(join(repo, "new.txt"), "new untracked content\n", "utf8");
+    const binary = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x01]);
+    writeFileSync(join(repo, "image.bin"), binary);
+    mkdirSync(join(repo, ".rn-grab-review"), { recursive: true });
+    writeFileSync(join(repo, ".rn-grab-review", "keep.jpg"), "ignored screenshot", "utf8");
+    const patchFile = join(root, "leftovers", "local-20261112-090012.patch");
+
+    expect(await git.saveLeftovers(repo, patchFile)).toBe(true);
+
+    expect(gitSync(repo, "status", "--porcelain").trim()).toBe("");
+    expect(readFileSync(join(repo, ".rn-grab-review", "keep.jpg"), "utf8")).toBe(
+      "ignored screenshot",
+    );
+    const patch = readFileSync(patchFile, "utf8");
+    expect(patch).toContain("line: dirty");
+    expect(patch).toContain("GIT binary patch");
+
+    gitSync(repo, "apply", patchFile);
+
+    expect(readFileSync(join(repo, "file.txt"), "utf8")).toBe("line: dirty\n");
+    expect(readFileSync(join(repo, "new.txt"), "utf8")).toBe("new untracked content\n");
+    expect(readFileSync(join(repo, "image.bin"))).toEqual(binary);
+    expect(readFileSync(join(repo, ".rn-grab-review", "keep.jpg"), "utf8")).toBe(
+      "ignored screenshot",
+    );
   });
 });
 

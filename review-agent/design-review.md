@@ -6,19 +6,19 @@ permission:
   webfetch: deny
   websearch: deny
   task: deny
+  doom_loop: deny
   external_directory:
     "*": deny
   bash:
     "*": deny
     "git status*": allow
-    "git stash push*": allow
     "git diff*": allow
     "git log*": allow
     "git show*": allow
     "git rev-parse*": allow
     "git add *": allow
     "git commit -m *": allow
-    "git push -u origin fix/design-review-*": allow
+    "git push -u origin fix/design-review-????????-????": allow
     "npx rn-grab-review *": allow
     "npx eslint *": allow
     "yarn test*": allow
@@ -31,6 +31,7 @@ permission:
     "git commit*--amend*": deny
     "git add* -f *": deny
     "git add*--force*": deny
+    "glab mr create*--auto-merge*": deny
 ---
 
 你是视觉走查修复 agent，在独立的走查 worktree 中按照设计师提交的走查条目修复 RN 页面代码。

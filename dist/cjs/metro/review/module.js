@@ -2,12 +2,19 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createReviewModule = void 0;
 const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
 const transitions_1 = require("../../review-core/transitions");
 const codemaker_1 = require("./codemaker");
 const git_1 = require("./git");
 const http_1 = require("./http");
 const runner_1 = require("./runner");
 const store_1 = require("./store");
+const pad2 = (value) => {
+    return String(value).padStart(2, "0");
+};
+const localStamp = (now) => {
+    return `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+};
 const createReviewModule = (dir) => {
     const store = store_1.ReviewStore.load(dir);
     const lock = (0, runner_1.createAgentLock)(store.lockPath());
@@ -23,6 +30,10 @@ const createReviewModule = (dir) => {
     const git = (0, git_1.createGit)();
     const run = async (message) => {
         const review = store.get();
+        const patchFile = (0, node_path_1.join)(dir, "leftovers", `${localStamp(new Date())}.patch`);
+        if (await git.saveLeftovers(review.worktree, patchFile)) {
+            log(`中间层已另存遗留改动：${patchFile}`);
+        }
         const args = review.sessionId === null
             ? (0, codemaker_1.codemakerArgs)({ worktree: review.worktree, message, title: `设计走查 ${review.id}` })
             : (0, codemaker_1.codemakerArgs)({ worktree: review.worktree, message, sessionId: review.sessionId });

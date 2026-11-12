@@ -1,10 +1,21 @@
 import { appendFileSync } from "node:fs";
+import { join } from "node:path";
 import { releaseFixing } from "../../review-core/transitions";
 import { codemakerArgs, parseSessionId, spawnCodemaker } from "./codemaker";
 import { createGit } from "./git";
 import { createReviewHandler } from "./http";
 import { AgentRunner, RESTART_RELEASE_MESSAGE, createAgentLock } from "./runner";
 import { ReviewStore } from "./store";
+
+const pad2 = (value: number): string => {
+  return String(value).padStart(2, "0");
+};
+
+const localStamp = (now: Date): string => {
+  return `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(
+    now.getHours(),
+  )}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`;
+};
 
 export const createReviewModule = (
   dir: string,
@@ -26,6 +37,10 @@ export const createReviewModule = (
 
   const run = async (message: string): Promise<{ exitCode: number }> => {
     const review = store.get();
+    const patchFile = join(dir, "leftovers", `${localStamp(new Date())}.patch`);
+    if (await git.saveLeftovers(review.worktree, patchFile)) {
+      log(`中间层已另存遗留改动：${patchFile}`);
+    }
     const args =
       review.sessionId === null
         ? codemakerArgs({ worktree: review.worktree, message, title: `设计走查 ${review.id}` })

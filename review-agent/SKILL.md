@@ -10,7 +10,7 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
 ## 1. 运行开始
 
 - 先读 worktree 根目录的 `AGENTS.md` 和 `docs/ai/conventions.md`，再读 `docs/ai/rn-rules.md` 的 §3.8、§8.2、§8.3。
-- 每次运行开始，先执行 `git status`。如果看到上次中断的运行留下的未提交改动：不要把它们提交进任何条目，先执行 `git stash push -u -m "design-review 遗留"` 收进 stash，避免把废弃的编辑混进别的条目的 commit。
+- 每轮开始前，中间层会把上一轮遗留的未提交改动另存并还原；你不需要自己处理遗留改动，也不要试图找回它们。
 
 ## 2. 逐条处理
 
@@ -21,7 +21,7 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
    - 控件条目：用 grab frames 给出的源码位置，结合控件矩形 rect 和路由名定位。
    - 整页条目：用 `src/config/router.js` 把路由映射到页面组件。
 3. 条目带 Figma 链接且 Figma MCP 可用时，读取设计值再动手修改。
-4. 修改后验证并提交：`npx eslint <改动文件>`，再跑 `node scripts/ai/check.js`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
+4. 修改后验证并提交：`npx eslint <改动文件>`，再跑 `node scripts/ai/check.js`；随后 stage 本条改动的文件：`git add <本条修改的文件>`，用明确路径逐个添加，不要用 `git add -A`，也不要用 `git add .`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
 5. `npx rn-grab-review reply <no> --message "<中文回复>" --commit <sha>` 回复，然后处理下一条。
 
 ## 3. 范围与禁区

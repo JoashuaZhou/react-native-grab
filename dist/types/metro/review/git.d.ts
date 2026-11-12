@@ -28,6 +28,7 @@ export declare const createGit: (run?: GitRunner) => {
         reason: "dirty" | "conflict";
     }>;
     hasNetDiff: (cwd: string, base: string) => Promise<boolean>;
+    saveLeftovers: (cwd: string, patchFile: string) => Promise<boolean>;
 };
 export type Git = ReturnType<typeof createGit>;
 //# sourceMappingURL=git.d.ts.map

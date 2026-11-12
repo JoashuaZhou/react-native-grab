@@ -182,6 +182,29 @@ const createGit = (run = defaultRunner) => {
         }
         throw fail(args, cwd, result);
     };
+    const saveLeftovers = async (cwd, patchFile) => {
+        if (await isClean(cwd)) {
+            return false;
+        }
+        const addArgs = ["add", "-A"];
+        const added = await run(addArgs, cwd);
+        if (added.code !== 0) {
+            throw fail(addArgs, cwd, added);
+        }
+        const diffArgs = ["diff", "--cached", "--binary"];
+        const diff = await run(diffArgs, cwd);
+        if (diff.code !== 0) {
+            throw fail(diffArgs, cwd, diff);
+        }
+        (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(patchFile), { recursive: true });
+        (0, node_fs_1.writeFileSync)(patchFile, diff.stdout, "utf8");
+        const resetArgs = ["reset", "--hard"];
+        const reset = await run(resetArgs, cwd);
+        if (reset.code !== 0) {
+            throw fail(resetArgs, cwd, reset);
+        }
+        return true;
+    };
     return {
         isClean,
         isBasePushed,
@@ -190,6 +213,7 @@ const createGit = (run = defaultRunner) => {
         verifyItemCommits,
         revertCommits,
         hasNetDiff,
+        saveLeftovers,
     };
 };
 exports.createGit = createGit;

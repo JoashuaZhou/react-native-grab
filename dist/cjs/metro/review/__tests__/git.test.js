@@ -215,6 +215,40 @@ const revertHeadPath = (repo) => {
         (0, vitest_1.expect)(await git.isBasePushed(repo, "base")).toBe(false);
     });
 });
+(0, vitest_1.describe)("saveLeftovers", () => {
+    (0, vitest_1.it)("returns false on a clean worktree without creating a patch", async () => {
+        const repo = makeRepo();
+        const git = (0, git_1.createGit)();
+        const patchFile = (0, node_path_1.join)(root, "leftovers", "local-20261112-090000.patch");
+        (0, vitest_1.expect)(await git.saveLeftovers(repo, patchFile)).toBe(false);
+        (0, vitest_1.expect)((0, node_fs_1.existsSync)(patchFile)).toBe(false);
+        (0, vitest_1.expect)((0, node_fs_1.existsSync)((0, node_path_1.join)(root, "leftovers"))).toBe(false);
+    });
+    (0, vitest_1.it)("saves tracked, new and binary changes, preserves ignored files and restores via git apply", async () => {
+        const repo = makeRepo();
+        const git = (0, git_1.createGit)();
+        (0, node_fs_1.mkdirSync)((0, node_path_1.join)(repo, ".git", "info"), { recursive: true });
+        (0, node_fs_1.appendFileSync)((0, node_path_1.join)(repo, ".git", "info", "exclude"), "\n.rn-grab-review/\n", "utf8");
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(repo, "file.txt"), "line: dirty\n", "utf8");
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(repo, "new.txt"), "new untracked content\n", "utf8");
+        const binary = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x01]);
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(repo, "image.bin"), binary);
+        (0, node_fs_1.mkdirSync)((0, node_path_1.join)(repo, ".rn-grab-review"), { recursive: true });
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(repo, ".rn-grab-review", "keep.jpg"), "ignored screenshot", "utf8");
+        const patchFile = (0, node_path_1.join)(root, "leftovers", "local-20261112-090012.patch");
+        (0, vitest_1.expect)(await git.saveLeftovers(repo, patchFile)).toBe(true);
+        (0, vitest_1.expect)(gitSync(repo, "status", "--porcelain").trim()).toBe("");
+        (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(repo, ".rn-grab-review", "keep.jpg"), "utf8")).toBe("ignored screenshot");
+        const patch = (0, node_fs_1.readFileSync)(patchFile, "utf8");
+        (0, vitest_1.expect)(patch).toContain("line: dirty");
+        (0, vitest_1.expect)(patch).toContain("GIT binary patch");
+        gitSync(repo, "apply", patchFile);
+        (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(repo, "file.txt"), "utf8")).toBe("line: dirty\n");
+        (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(repo, "new.txt"), "utf8")).toBe("new untracked content\n");
+        (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(repo, "image.bin"))).toEqual(binary);
+        (0, vitest_1.expect)((0, node_fs_1.readFileSync)((0, node_path_1.join)(repo, ".rn-grab-review", "keep.jpg"), "utf8")).toBe("ignored screenshot");
+    });
+});
 (0, vitest_1.describe)("createGit command wiring", () => {
     (0, vitest_1.it)("passes argument arrays to the runner and maps exit codes and output", async () => {
         const calls = [];
