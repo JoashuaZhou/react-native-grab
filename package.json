@@ -18,8 +18,12 @@
     "type": "git",
     "url": "https://github.com/callstackincubator/react-native-grab.git"
   },
+  "bin": {
+    "rn-grab-review": "dist/cjs/cli/review.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "review-agent"
   ],
   "main": "./dist/cjs/react-native/index.js",
   "module": "./dist/esm/react-native/index.js",
@@ -90,5 +94,6 @@
     "expo-dev-menu": {
       "optional": true
     }
-  }
+  },
+  "rnGrabReview": 1
 }
