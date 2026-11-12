@@ -12,10 +12,13 @@ const BUSY_BANNER = "agent 修复中…";
 const BLOCKED_BANNER = "agent 运行异常，请联系工程师处理（rn-grab-review retry）";
 const REVERT_CONFIRM_MESSAGE = "撤销后这条的代码改动会被还原，确定吗？";
 const REVERT_CONFLICT_ERROR = "撤销失败：和后面的改动冲突，请联系工程师处理";
-// `bad_code` after the view's own pair attempt means the typed code is wrong;
-// the same error without an attempt comes from a stale stored code (the store
-// clears it and keeps the error for this view to explain).
-export const pairingErrorText = (error, hasPairAttempt) => {
+// A stale stored code keeps its message via the store's stalePairing flag (openList
+// clears `error` but not the flag). A failed manual pair attempt explains itself
+// instead: `bad_code` then means the typed code was wrong.
+export const pairingErrorText = (error, hasPairAttempt, stalePairing) => {
+    if (stalePairing && !(error !== null && hasPairAttempt)) {
+        return PAIRING_STALE_MESSAGE;
+    }
     if (error === null) {
         return null;
     }
@@ -65,7 +68,7 @@ const ItemRow = ({ busy, item, onDelete, onEdit, onPass, onReject, onRevert, pen
     const reply = latestReplyText(item);
     return (_jsxs(View, { style: styles.itemRow, children: [_jsx(ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), _jsxs(View, { style: styles.itemBody, children: [_jsxs(Text, { style: styles.itemNo, children: ["#", item.no] }), _jsx(Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && (_jsxs(Text, { style: styles.itemReply, numberOfLines: 3, children: ["\u56DE\u590D\uFF1A", reply] })), _jsxs(View, { style: styles.itemActions, children: [item.actions.includes("edit") && (_jsx(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && (_jsx(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && (_jsx(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && (_jsx(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && (_jsx(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && (_jsxs(_Fragment, { children: [_jsx(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), _jsx(Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
 };
-const PairingView = ({ error }) => {
+const PairingView = ({ error, stalePairing, }) => {
     const [code, setCode] = useState("");
     const [isPairing, setIsPairing] = useState(false);
     const [hasPairAttempt, setHasPairAttempt] = useState(false);
@@ -78,10 +81,10 @@ const PairingView = ({ error }) => {
         await reviewActions.pair(code);
         setIsPairing(false);
     };
-    return (_jsxs(View, { style: styles.centered, children: [_jsx(Text, { style: styles.pairingTitle, children: "\u8FDE\u63A5\u8D70\u67E5" }), _jsx(TextInput, { keyboardType: "number-pad", maxLength: 6, onChangeText: (text) => setCode(text.replace(/\D/g, "").slice(0, 6)), placeholder: "\u8BF7\u8F93\u5165 6 \u4F4D\u914D\u5BF9\u7801", style: styles.pairingInput, value: code }), pairingErrorText(error, hasPairAttempt) !== null && (_jsx(Text, { style: styles.errorText, children: pairingErrorText(error, hasPairAttempt) })), _jsx(ActionButton, { disabled: isPairing || code.length !== 6, label: isPairing ? "配对中…" : "配对", onPress: () => void handlePair(), primary: true })] }));
+    return (_jsxs(View, { style: styles.centered, children: [_jsx(Text, { style: styles.pairingTitle, children: "\u8FDE\u63A5\u8D70\u67E5" }), _jsx(TextInput, { keyboardType: "number-pad", maxLength: 6, onChangeText: (text) => setCode(text.replace(/\D/g, "").slice(0, 6)), placeholder: "\u8BF7\u8F93\u5165 6 \u4F4D\u914D\u5BF9\u7801", style: styles.pairingInput, value: code }), pairingErrorText(error, hasPairAttempt, stalePairing) !== null && (_jsx(Text, { style: styles.errorText, children: pairingErrorText(error, hasPairAttempt, stalePairing) })), _jsx(ActionButton, { disabled: isPairing || code.length !== 6, label: isPairing ? "配对中…" : "配对", onPress: () => void handlePair(), primary: true })] }));
 };
 export const ReviewListPanel = () => {
-    const { composer, error, items, listVisible, paired, review, runner } = useReviewState();
+    const { composer, error, items, listVisible, paired, review, runner, stalePairing } = useReviewState();
     const [pending, setPending] = useState(false);
     const runAction = async (task) => {
         if (pending) {
@@ -108,7 +111,7 @@ export const ReviewListPanel = () => {
     };
     const footer = footerState(review, items);
     const groups = groupItemsByStatus(items);
-    return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeList, statusBarTranslucent: true, visible: listVisible, children: _jsxs(View, { style: styles.panel, children: [_jsxs(View, { style: [styles.header, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }], children: [_jsx(Text, { style: styles.headerTitle, children: "\u8D70\u67E5\u5217\u8868" }), _jsx(Pressable, { hitSlop: 8, onPress: reviewActions.closeList, children: _jsx(Text, { style: styles.headerAction, children: "\u5173\u95ED" }) })] }), !paired ? (_jsx(PairingView, { error: error })) : (_jsxs(_Fragment, { children: [runner.busy && _jsx(Text, { style: styles.banner, children: BUSY_BANNER }), runner.blocked && (_jsx(Text, { style: [styles.banner, styles.bannerError], children: BLOCKED_BANNER })), _jsxs(ScrollView, { bounces: false, contentContainerStyle: styles.listContent, children: [groups.length === 0 && (_jsx(Text, { style: styles.emptyText, children: review === null ? "加载中…" : "暂无条目" })), groups.map((group) => (_jsxs(View, { children: [_jsx(Text, { style: styles.groupLabel, children: group.label }), group.items.map((item) => (_jsx(ItemRow, { busy: runner.busy, item: item, onDelete: () => void runAction(() => reviewActions.remove(item.no)), onEdit: () => reviewActions.openComposer({ mode: "edit", item }), onPass: () => void runAction(() => reviewActions.pass(item.no)), onReject: () => reviewActions.openComposer({ mode: "reject", item }), onRevert: () => confirmRevert(item), pending: pending }, item.no)))] }, group.status)))] }), actionErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: actionErrorText(error) })), _jsxs(View, { style: styles.footer, children: [_jsx(ActionButton, { disabled: pending || footer.submitCount === 0, label: `提交（${footer.submitCount}）`, onPress: () => void runAction(() => reviewActions.submit()), primary: footer.submitCount > 0 }), footer.mrUrl !== null ? (_jsx(ActionButton, { disabled: false, label: "\u67E5\u770B MR", onPress: () => {
+    return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeList, statusBarTranslucent: true, visible: listVisible, children: _jsxs(View, { style: styles.panel, children: [_jsxs(View, { style: [styles.header, { paddingTop: initialWindowMetrics?.insets.top ?? 0 }], children: [_jsx(Text, { style: styles.headerTitle, children: "\u8D70\u67E5\u5217\u8868" }), _jsx(Pressable, { hitSlop: 8, onPress: reviewActions.closeList, children: _jsx(Text, { style: styles.headerAction, children: "\u5173\u95ED" }) })] }), !paired ? (_jsx(PairingView, { error: error, stalePairing: stalePairing })) : (_jsxs(_Fragment, { children: [runner.busy && _jsx(Text, { style: styles.banner, children: BUSY_BANNER }), runner.blocked && (_jsx(Text, { style: [styles.banner, styles.bannerError], children: BLOCKED_BANNER })), _jsxs(ScrollView, { bounces: false, contentContainerStyle: styles.listContent, children: [groups.length === 0 && (_jsx(Text, { style: styles.emptyText, children: review === null ? "加载中…" : "暂无条目" })), groups.map((group) => (_jsxs(View, { children: [_jsx(Text, { style: styles.groupLabel, children: group.label }), group.items.map((item) => (_jsx(ItemRow, { busy: runner.busy, item: item, onDelete: () => void runAction(() => reviewActions.remove(item.no)), onEdit: () => reviewActions.openComposer({ mode: "edit", item }), onPass: () => void runAction(() => reviewActions.pass(item.no)), onReject: () => reviewActions.openComposer({ mode: "reject", item }), onRevert: () => confirmRevert(item), pending: pending }, item.no)))] }, group.status)))] }), actionErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: actionErrorText(error) })), _jsxs(View, { style: styles.footer, children: [_jsx(ActionButton, { disabled: pending || footer.submitCount === 0, label: `提交（${footer.submitCount}）`, onPress: () => void runAction(() => reviewActions.submit()), primary: footer.submitCount > 0 }), footer.mrUrl !== null ? (_jsx(ActionButton, { disabled: false, label: "\u67E5\u770B MR", onPress: () => {
                                         void Linking.openURL(footer.mrUrl ?? "").catch(() => { });
                                     } })) : (footer.canFinish && (_jsx(ActionButton, { disabled: pending, label: "\u5B8C\u6210\u8D70\u67E5", onPress: () => void runAction(() => reviewActions.finish()), primary: true })))] })] })), listVisible && composer !== null && (_jsx(View, { style: styles.composerOverlay, children: _jsx(ComposerSheet, { composer: composer, error: error }) }))] }) }));
 };

@@ -90,6 +90,7 @@ const createComposer = (kind) => ({
 });
 const baseState = () => ({
     paired: true,
+    stalePairing: false,
     review: reviewView(),
     items: [],
     runner: { busy: false, blocked: false },

@@ -65,6 +65,7 @@ import { ReviewListPanel } from "../list-panel";
 const asElement = (value) => value;
 const baseState = () => ({
     paired: false,
+    stalePairing: false,
     review: null,
     items: [],
     runner: { busy: false, blocked: false },
@@ -118,7 +119,19 @@ describe("pairing view errors", () => {
         runtime.pairCalls.length = 0;
     });
     it("tells the designer the review was replaced when a stored code goes stale", () => {
-        runtime.reviewState.error = { code: "bad_code", status: 401 };
+        runtime.reviewState = {
+            ...baseState(),
+            stalePairing: true,
+            error: { code: "bad_code", status: 401 },
+        };
+        const pairing = renderPanel();
+        const errorText = asElement(pairing.props.children[2]);
+        expect(errorText.props.children).toBe("走查已更换，请输入新的配对码");
+    });
+    it("keeps the stale message after the list reopens with the error cleared", () => {
+        // The store clears the error on openList; only the stalePairing flag keeps
+        // the mount-time stale detection visible on the pairing view.
+        runtime.reviewState = { ...baseState(), stalePairing: true };
         const pairing = renderPanel();
         const errorText = asElement(pairing.props.children[2]);
         expect(errorText.props.children).toBe("走查已更换，请输入新的配对码");
@@ -135,6 +148,19 @@ describe("pairing view errors", () => {
         const pairingAfter = renderPanel();
         const errorText = asElement(pairingAfter.props.children[2]);
         expect(runtime.pairCalls).toEqual([["012345"]]);
+        expect(errorText.props.children).toBe("配对码不正确，请重试");
+    });
+    it("prefers the wrong-code message over the stale one after a failed attempt", async () => {
+        runtime.reviewState = { ...baseState(), stalePairing: true };
+        const pairing = renderPanel();
+        const input = asElement(pairing.props.children[1]);
+        input.props.onChangeText("012345");
+        const reRendered = renderPanel();
+        const button = asElement(reRendered.props.children[3]);
+        const pressable = asElement(button.type(button.props));
+        await pressable.props.onPress();
+        const pairingAfter = renderPanel();
+        const errorText = asElement(pairingAfter.props.children[2]);
         expect(errorText.props.children).toBe("配对码不正确，请重试");
     });
 });

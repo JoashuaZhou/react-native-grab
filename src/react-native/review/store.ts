@@ -28,6 +28,9 @@ export type ComposerFields = {
 
 export type ReviewStoreState = {
   paired: boolean;
+  // A stored code the server rejected as stale keeps the pairing view's
+  // message across openList (which clears `error`); a successful pair clears it.
+  stalePairing: boolean;
   review: DeviceReviewView | null;
   items: DeviceItemView[];
   runner: ReviewRunnerInfo;
@@ -41,6 +44,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 let state: ReviewStoreState = {
   paired: false,
+  stalePairing: false,
   review: null,
   items: [],
   runner: { busy: false, blocked: false },
@@ -84,8 +88,8 @@ const toReviewApiError = (error: unknown): ReviewApiError =>
   error instanceof ReviewApiError ? error : new ReviewApiError("network", 0);
 
 // A code the server rejects with `bad_code` belongs to a previous review, so it is
-// cleared from storage and the loaded review state goes with it; the error stays
-// for the pairing view to explain.
+// cleared from storage and the loaded review state goes with it; the error and the
+// stalePairing flag stay for the pairing view to explain, until a successful pair.
 const clearStalePairing = (error: ReviewApiError): void => {
   try {
     getReviewHost()?.storage?.set(PAIRING_CODE_STORAGE_KEY, "");
@@ -95,6 +99,7 @@ const clearStalePairing = (error: ReviewApiError): void => {
   setState((prevState) => ({
     ...prevState,
     paired: false,
+    stalePairing: true,
     review: null,
     items: [],
     runner: { busy: false, blocked: false },
@@ -175,6 +180,8 @@ export const reviewActions = {
     try {
       await createApiForCode(code).pair(code);
       getReviewHost()?.storage?.set(PAIRING_CODE_STORAGE_KEY, code);
+      // Pairing with the current review's code ends any stale-code message.
+      setState((prevState) => ({ ...prevState, stalePairing: false }));
     } catch (error) {
       setState((prevState) => ({ ...prevState, error: toReviewApiError(error) }));
       return false;

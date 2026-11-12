@@ -152,7 +152,7 @@ describe("design-review skill", () => {
       "npx rn-grab-review claim",
       "store shape",
       "不要恢复",
-      "yarn test",
+      "在 worktree 中执行",
       "force push",
     ]) {
       const at = skill.indexOf(anchor);
@@ -174,6 +174,115 @@ describe("design-review skill", () => {
     for (const phrase of phrases) {
       expect(skill).toContain(phrase);
     }
+  });
+});
+
+describe("round 1 fix: verification rules", () => {
+  it("scopes eslint to JS-family files and routes JSON through check-json", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain(".js/.jsx/.ts/.tsx");
+    expect(skill).toContain("不要把 JSON 文件传给 eslint");
+    expect(skill).toContain("npx rn-grab-review check-json <改动文件>...");
+  });
+
+  it("runs a related i18n test when one exists", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("yarn test src/page/Plugin/keenetic/__tests__/i18nKeys.test.js");
+  });
+
+  it("requires all checks to pass before committing and bans diff-only verification", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("所有检查都通过后才能提交");
+    expect(skill).toContain("只看 diff 不算验证");
+    expect(skill).toContain("node scripts/ai/check.js");
+  });
+});
+
+describe("round 1 fix: tools and agent CLI list", () => {
+  it("restricts file discovery to read/glob/grep instead of bash ls/grep/find", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("只用 read/glob/grep 工具");
+    expect(skill).toContain("不要用 bash 的 ls、grep、find");
+  });
+
+  it("lists exactly the six agent subcommands and no --help", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("status、item、claim、reply、complete、check-json");
+    expect(skill).toContain("也不要调用 `--help`");
+    expect(skill).toContain("start、serve、retry、stop 是工程师用的命令");
+  });
+});
+
+describe("round 1 fix: upload rule and MR template", () => {
+  it("narrows the upload permission to the item screenshot form rule", () => {
+    const fm = frontmatterOf(readAgentDoc());
+    expect(fm).toContain(
+      '"glab api --method POST projects/:fullpath/uploads --form file=@.rn-grab-review/item-*.jpg": allow',
+    );
+    expect(fm).not.toContain('"glab api --method POST projects/:fullpath/uploads *": allow');
+  });
+
+  it("allows exactly the agent subcommands instead of the broad CLI rule", () => {
+    const fm = frontmatterOf(readAgentDoc());
+    for (const sub of ["status", "item", "claim", "reply", "complete", "check-json"]) {
+      expect(fm).toContain(`"npx rn-grab-review ${sub}*": allow`);
+    }
+    expect(fm).not.toContain('"npx rn-grab-review *": allow');
+  });
+
+  it("pins the exact upload command in the skill", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain(
+      "glab api --method POST projects/:fullpath/uploads --form file=@.rn-grab-review/item-<no>.jpg",
+    );
+  });
+
+  it("pins the fixed per-item MR template", () => {
+    const skill = readSkillDoc();
+    for (const phrase of [
+      "状态：",
+      "页面/路由：",
+      "范围：只改这里 / 改公共组件",
+      "位置：控件条目写",
+      "（pt，屏幕 <宽>×<高> pt）",
+      "整页条目的位置写「整页」",
+      "代码位置：`<文件路径>:<行号>`",
+      "截图：该条上传后的截图链接",
+      "每一轮的描述、回复和 commit",
+      "已撤销的条目同样按模板列出",
+      "一期只用文字坐标",
+    ]) {
+      expect(skill).toContain(phrase);
+    }
+  });
+
+  it("keeps the shared/unfixed/reverted sections in the MR description", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain(
+      "单独分节列出涉及公共组件的条目、未修复（需要人工处理）的条目和已撤销的条目",
+    );
+  });
+});
+
+describe("round 1 correction: MR template page and route", () => {
+  it("always writes the actual route for page and element items", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("控件条目和整页条目都写条目实际所在的路由名");
+    expect(skill).toContain("取自 item 输出的「路由」");
+    expect(skill).toContain("不要用「整页」代替路由");
+    expect(skill).not.toContain("页面/路由：整页条目写「整页」");
+  });
+
+  it("keeps 整页 only as the position of page items", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("「整页」只出现在这里");
+    expect(skill).toContain("整页条目的位置写「整页」");
+  });
+
+  it("keeps the code file:line field for every item", () => {
+    const skill = readSkillDoc();
+    expect(skill).toContain("代码位置：`<文件路径>:<行号>`");
+    expect(skill).toContain("没有则写「无」");
   });
 });
 

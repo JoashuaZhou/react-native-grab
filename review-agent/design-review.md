@@ -19,13 +19,18 @@ permission:
     "git add *": allow
     "git commit -m *": allow
     "git push -u origin fix/design-review-????????-????": allow
-    "npx rn-grab-review *": allow
+    "npx rn-grab-review status*": allow
+    "npx rn-grab-review item*": allow
+    "npx rn-grab-review claim*": allow
+    "npx rn-grab-review reply*": allow
+    "npx rn-grab-review complete*": allow
+    "npx rn-grab-review check-json*": allow
     "npx eslint *": allow
     "yarn test*": allow
     "node scripts/ai/check.js": allow
     "node scripts/ai/check-commit-msg.js *": allow
     "glab mr create *": allow
-    "glab api --method POST projects/:fullpath/uploads *": allow
+    "glab api --method POST projects/:fullpath/uploads --form file=@.rn-grab-review/item-*.jpg": allow
     "git push*--force*": deny
     "git push* -f*": deny
     "git commit*--amend*": deny

@@ -25,6 +25,9 @@ export type Command = {
     name: "retry";
 } | {
     name: "stop";
+} | {
+    name: "check-json";
+    files: string[];
 };
 export declare const parseArgs: (argv: string[]) => Command;
 //# sourceMappingURL=args.d.ts.map

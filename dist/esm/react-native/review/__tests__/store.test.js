@@ -432,4 +432,51 @@ describe("stored pairing code", () => {
         expect(store.useReviewState().error).toBeNull();
     });
 });
+describe("stale pairing flag", () => {
+    it("sets the flag when a stored code goes stale on a refresh", async () => {
+        routeFetch({ "GET state": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+        seedPairingCode();
+        const store = await loadStore();
+        await store.reviewActions.refresh();
+        expect(store.useReviewState().stalePairing).toBe(true);
+        expect(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+    });
+    it("keeps the flag through openList while the error is cleared", async () => {
+        routeFetch({ "GET state": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+        seedPairingCode();
+        const store = await loadStore();
+        // Mount-time refresh detects the stale code, then the panel opens.
+        await store.reviewActions.refresh();
+        store.reviewActions.openList();
+        const state = store.useReviewState();
+        expect(state.listVisible).toBe(true);
+        expect(state.error).toBeNull();
+        expect(state.stalePairing).toBe(true);
+    });
+    it("clears the flag after a successful pair", async () => {
+        routeFetch({
+            "POST pair": () => ({ body: { ok: true, review: reviewView() } }),
+            "GET state": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }),
+        });
+        seedPairingCode();
+        const store = await loadStore();
+        await store.reviewActions.refresh();
+        expect(store.useReviewState().stalePairing).toBe(true);
+        routeFetch({
+            "POST pair": () => ({ body: { ok: true, review: reviewView() } }),
+            "GET state": () => ({ body: statePayload([itemView()]) }),
+        });
+        const paired = await store.reviewActions.pair("543210");
+        expect(paired).toBe(true);
+        expect(store.useReviewState().stalePairing).toBe(false);
+        expect(store.useReviewState().paired).toBe(true);
+    });
+    it("does not set the flag when a manual pairing attempt fails", async () => {
+        routeFetch({ "POST pair": () => ({ body: { ok: false, error: "bad_code" }, status: 401 }) });
+        const store = await loadStore();
+        await store.reviewActions.pair("000000");
+        expect(store.useReviewState().stalePairing).toBe(false);
+        expect(store.useReviewState().error).toMatchObject({ code: "bad_code", status: 401 });
+    });
+});
 //# sourceMappingURL=store.test.js.map

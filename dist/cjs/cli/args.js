@@ -10,7 +10,8 @@ const USAGE = `用法：
   rn-grab-review reply <no> --message <text> [--commit <sha>]...
   rn-grab-review complete [--mr <url>]
   rn-grab-review retry
-  rn-grab-review stop`;
+  rn-grab-review stop
+  rn-grab-review check-json <file>...`;
 const NUMBER_RE = /^\d+$/;
 function usageThrow(message) {
     throw new Error(`${message}\n${USAGE}`);
@@ -121,6 +122,13 @@ const parseArgs = (argv) => {
     if (command === "complete") {
         const state = parseOptions(rest, { valueOptions: new Set(["--mr"]), flagOptions: new Set() });
         return { name: "complete", mr: singleValue(state, "--mr") ?? null };
+    }
+    if (command === "check-json") {
+        const state = parseOptions(rest, { valueOptions: new Set(), flagOptions: new Set() });
+        if (state.positionals.length === 0) {
+            usageThrow("check-json 需要至少一个文件路径");
+        }
+        return { name: "check-json", files: state.positionals };
     }
     usageThrow(`未知命令：${command}`);
 };

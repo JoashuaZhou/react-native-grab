@@ -26,13 +26,17 @@ const BLOCKED_BANNER = "agent 运行异常，请联系工程师处理（rn-grab-
 const REVERT_CONFIRM_MESSAGE = "撤销后这条的代码改动会被还原，确定吗？";
 const REVERT_CONFLICT_ERROR = "撤销失败：和后面的改动冲突，请联系工程师处理";
 
-// `bad_code` after the view's own pair attempt means the typed code is wrong;
-// the same error without an attempt comes from a stale stored code (the store
-// clears it and keeps the error for this view to explain).
+// A stale stored code keeps its message via the store's stalePairing flag (openList
+// clears `error` but not the flag). A failed manual pair attempt explains itself
+// instead: `bad_code` then means the typed code was wrong.
 export const pairingErrorText = (
   error: ReviewApiError | null,
   hasPairAttempt: boolean,
+  stalePairing: boolean,
 ): string | null => {
+  if (stalePairing && !(error !== null && hasPairAttempt)) {
+    return PAIRING_STALE_MESSAGE;
+  }
   if (error === null) {
     return null;
   }
@@ -169,7 +173,13 @@ const ItemRow = ({
   );
 };
 
-const PairingView = ({ error }: { error: ReviewApiError | null }) => {
+const PairingView = ({
+  error,
+  stalePairing,
+}: {
+  error: ReviewApiError | null;
+  stalePairing: boolean;
+}) => {
   const [code, setCode] = useState("");
   const [isPairing, setIsPairing] = useState(false);
   const [hasPairAttempt, setHasPairAttempt] = useState(false);
@@ -195,8 +205,10 @@ const PairingView = ({ error }: { error: ReviewApiError | null }) => {
         style={styles.pairingInput}
         value={code}
       />
-      {pairingErrorText(error, hasPairAttempt) !== null && (
-        <Text style={styles.errorText}>{pairingErrorText(error, hasPairAttempt)}</Text>
+      {pairingErrorText(error, hasPairAttempt, stalePairing) !== null && (
+        <Text style={styles.errorText}>
+          {pairingErrorText(error, hasPairAttempt, stalePairing)}
+        </Text>
       )}
       <ActionButton
         disabled={isPairing || code.length !== 6}
@@ -209,7 +221,8 @@ const PairingView = ({ error }: { error: ReviewApiError | null }) => {
 };
 
 export const ReviewListPanel = () => {
-  const { composer, error, items, listVisible, paired, review, runner } = useReviewState();
+  const { composer, error, items, listVisible, paired, review, runner, stalePairing } =
+    useReviewState();
   const [pending, setPending] = useState(false);
 
   const runAction = async (task: () => Promise<boolean>) => {
@@ -255,7 +268,7 @@ export const ReviewListPanel = () => {
         </View>
 
         {!paired ? (
-          <PairingView error={error} />
+          <PairingView error={error} stalePairing={stalePairing} />
         ) : (
           <>
             {runner.busy && <Text style={styles.banner}>{BUSY_BANNER}</Text>}

@@ -7,7 +7,8 @@ export type Command =
   | { name: "reply"; no: number; message: string; commits: string[] }
   | { name: "complete"; mr: string | null }
   | { name: "retry" }
-  | { name: "stop" };
+  | { name: "stop" }
+  | { name: "check-json"; files: string[] };
 
 const USAGE = `用法：
   rn-grab-review start --base <branch> [--repo <path>]
@@ -18,7 +19,8 @@ const USAGE = `用法：
   rn-grab-review reply <no> --message <text> [--commit <sha>]...
   rn-grab-review complete [--mr <url>]
   rn-grab-review retry
-  rn-grab-review stop`;
+  rn-grab-review stop
+  rn-grab-review check-json <file>...`;
 
 const NUMBER_RE = /^\d+$/;
 
@@ -156,6 +158,14 @@ export const parseArgs = (argv: string[]): Command => {
   if (command === "complete") {
     const state = parseOptions(rest, { valueOptions: new Set(["--mr"]), flagOptions: new Set() });
     return { name: "complete", mr: singleValue(state, "--mr") ?? null };
+  }
+
+  if (command === "check-json") {
+    const state = parseOptions(rest, { valueOptions: new Set(), flagOptions: new Set() });
+    if (state.positionals.length === 0) {
+      usageThrow("check-json 需要至少一个文件路径");
+    }
+    return { name: "check-json", files: state.positionals };
   }
 
   usageThrow(`未知命令：${command}`);

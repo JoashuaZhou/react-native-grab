@@ -6,6 +6,7 @@ import { randomInt } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { parseArgs } from "./args";
+import { runCheckJson } from "./check-json";
 import { claim, complete, printStatus, reply, retry, showItem, stopReview } from "./local-client";
 import { createInstallDeps, serveReview, startReview } from "./start";
 import { installAgentFiles } from "./agent-files";
@@ -138,6 +139,13 @@ const main = async (argv) => {
         case "stop":
             await stopReview(paths);
             return;
+        case "check-json": {
+            const allValid = runCheckJson(command.files);
+            if (!allValid) {
+                process.exitCode = 1;
+            }
+            return;
+        }
     }
 };
 main(process.argv.slice(2)).catch((error) => {

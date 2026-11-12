@@ -23,6 +23,17 @@ const args_1 = require("../args");
         (0, vitest_1.expect)((0, args_1.parseArgs)(["retry"])).toEqual({ name: "retry" });
         (0, vitest_1.expect)((0, args_1.parseArgs)(["stop"])).toEqual({ name: "stop" });
     });
+    (0, vitest_1.it)("parses check-json with one or more file paths", () => {
+        (0, vitest_1.expect)((0, args_1.parseArgs)(["check-json", "a.json"])).toEqual({ name: "check-json", files: ["a.json"] });
+        (0, vitest_1.expect)((0, args_1.parseArgs)(["check-json", "a.json", "b.json", "c.json"])).toEqual({
+            name: "check-json",
+            files: ["a.json", "b.json", "c.json"],
+        });
+    });
+    (0, vitest_1.it)("rejects check-json without files or with flags", () => {
+        (0, vitest_1.expect)(() => (0, args_1.parseArgs)(["check-json"])).toThrow();
+        (0, vitest_1.expect)(() => (0, args_1.parseArgs)(["check-json", "a.json", "--json"])).toThrow();
+    });
     (0, vitest_1.it)("parses item with and without --json", () => {
         (0, vitest_1.expect)((0, args_1.parseArgs)(["item", "3", "--json"])).toEqual({ name: "item", no: 3, json: true });
         (0, vitest_1.expect)((0, args_1.parseArgs)(["item", "3"])).toEqual({ name: "item", no: 3, json: false });

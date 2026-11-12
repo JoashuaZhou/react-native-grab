@@ -8,6 +8,7 @@ const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const args_1 = require("./args");
+const check_json_1 = require("./check-json");
 const local_client_1 = require("./local-client");
 const start_1 = require("./start");
 const agent_files_1 = require("./agent-files");
@@ -140,6 +141,13 @@ const main = async (argv) => {
         case "stop":
             await (0, local_client_1.stopReview)(paths);
             return;
+        case "check-json": {
+            const allValid = (0, check_json_1.runCheckJson)(command.files);
+            if (!allValid) {
+                process.exitCode = 1;
+            }
+            return;
+        }
     }
 };
 main(process.argv.slice(2)).catch((error) => {

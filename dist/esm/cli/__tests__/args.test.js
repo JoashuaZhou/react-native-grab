@@ -21,6 +21,17 @@ describe("parseArgs", () => {
         expect(parseArgs(["retry"])).toEqual({ name: "retry" });
         expect(parseArgs(["stop"])).toEqual({ name: "stop" });
     });
+    it("parses check-json with one or more file paths", () => {
+        expect(parseArgs(["check-json", "a.json"])).toEqual({ name: "check-json", files: ["a.json"] });
+        expect(parseArgs(["check-json", "a.json", "b.json", "c.json"])).toEqual({
+            name: "check-json",
+            files: ["a.json", "b.json", "c.json"],
+        });
+    });
+    it("rejects check-json without files or with flags", () => {
+        expect(() => parseArgs(["check-json"])).toThrow();
+        expect(() => parseArgs(["check-json", "a.json", "--json"])).toThrow();
+    });
     it("parses item with and without --json", () => {
         expect(parseArgs(["item", "3", "--json"])).toEqual({ name: "item", no: 3, json: true });
         expect(parseArgs(["item", "3"])).toEqual({ name: "item", no: 3, json: false });

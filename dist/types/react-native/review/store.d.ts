@@ -22,6 +22,7 @@ export type ComposerFields = {
 };
 export type ReviewStoreState = {
     paired: boolean;
+    stalePairing: boolean;
     review: DeviceReviewView | null;
     items: DeviceItemView[];
     runner: ReviewRunnerInfo;

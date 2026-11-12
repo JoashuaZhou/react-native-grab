@@ -106,6 +106,7 @@ const createComposer = (kind: "element" | "page"): ComposerState => ({
 
 const baseState = (): ReviewStoreState => ({
   paired: true,
+  stalePairing: false,
   review: reviewView(),
   items: [],
   runner: { busy: false, blocked: false },

@@ -11,6 +11,8 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
 
 - 先读 worktree 根目录的 `AGENTS.md` 和 `docs/ai/conventions.md`，再读 `docs/ai/rn-rules.md` 的 §3.8、§8.2、§8.3。
 - 每轮开始前，中间层会把上一轮遗留的未提交改动另存并还原；你不需要自己处理遗留改动，也不要试图找回它们。
+- 文件的查找和读取只用 read/glob/grep 工具；不要用 bash 的 ls、grep、find。
+- 你可用的 CLI 只有 `npx rn-grab-review` 的六个子命令：status、item、claim、reply、complete、check-json；不要执行其他子命令，也不要调用 `--help`。start、serve、retry、stop 是工程师用的命令，与你无关。
 
 ## 2. 逐条处理
 
@@ -21,7 +23,12 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
    - 控件条目：用 grab frames 给出的源码位置，结合控件矩形 rect 和路由名定位。
    - 整页条目：用 `src/config/router.js` 把路由映射到页面组件。
 3. 条目带 Figma 链接且 Figma MCP 可用时，读取设计值再动手修改。
-4. 修改后验证并提交：`npx eslint <改动文件>`，再跑 `node scripts/ai/check.js`；随后 stage 本条改动的文件：`git add <本条修改的文件>`，用明确路径逐个添加，不要用 `git add -A`，也不要用 `git add .`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
+4. 修改后逐项验证，所有检查都通过后才能提交，只看 diff 不算验证：
+   - 代码文件：只对 .js/.jsx/.ts/.tsx 的改动文件运行 `npx eslint <改动文件>`，不要把 JSON 文件传给 eslint。
+   - JSON 文件：用 `npx rn-grab-review check-json <改动文件>...` 校验。
+   - 文案（i18n）类改动：存在相关测试时运行，例如 `yarn test src/page/Plugin/keenetic/__tests__/i18nKeys.test.js`。
+   - 每条都跑 `node scripts/ai/check.js`。
+   随后 stage 本条改动的文件：`git add <本条修改的文件>`，用明确路径逐个添加，不要用 `git add -A`，也不要用 `git add .`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
 5. `npx rn-grab-review reply <no> --message "<中文回复>" --commit <sha>` 回复，然后处理下一条。
 
 ## 3. 范围与禁区
@@ -41,8 +48,17 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
 
 1. 在 worktree 中执行 `yarn test`。
 2. 执行 `git push -u origin <走查分支>`。
-3. 用 `glab api --method POST projects/:fullpath/uploads` 逐条上传条目截图，记录返回的链接。
-4. 执行 `glab mr create --source-branch <走查分支> --target-branch <base> --title "fix(design-review): 视觉走查修复（<走查分支>）"`；描述逐条列出截图、设计师每一轮的描述、改动范围、每一轮回复和对应 commit，并单独列出涉及公共组件的条目、未修复（需要人工处理）的条目和已撤销的条目。
+3. 用 `glab api --method POST projects/:fullpath/uploads --form file=@.rn-grab-review/item-<no>.jpg` 逐条上传条目截图，记录返回的链接。
+4. 执行 `glab mr create --source-branch <走查分支> --target-branch <base> --title "fix(design-review): 视觉走查修复（<走查分支>）"`。MR 描述用固定模板逐条列出全部条目（已撤销的条目同样按模板列出），每条包含：
+   - 状态：`#<no>` 的条目状态。
+   - 页面/路由：控件条目和整页条目都写条目实际所在的路由名（页面组件），取自 item 输出的「路由」；路由为「无」时写「无」，不要用「整页」代替路由。
+   - 范围：只改这里 / 改公共组件。
+   - 位置：控件条目写 `x <x>，y <y>，宽 <宽>，高 <高>（pt，屏幕 <宽>×<高> pt）`，数值取自 item 输出的矩形和屏幕；「整页」只出现在这里：整页条目的位置写「整页」。一期只用文字坐标，不在截图上叠加标注。
+   - 代码位置：`<文件路径>:<行号>`，来自抓取的源码位置，没有则写「无」。
+   - 截图：该条上传后的截图链接。
+   - 每一轮的描述、回复和 commit，逐轮取自 item 输出。
+
+   并单独分节列出涉及公共组件的条目、未修复（需要人工处理）的条目和已撤销的条目。
 5. 执行 `npx rn-grab-review complete --mr <MR 链接>`。
 
 ## 6. 禁止
