@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.toggleGrabMenu = exports.enableGrabbing = exports.clearGrabOwnerPresentation = exports.hideGrabSelectionMenu = exports.showGrabSelectionMenu = exports.setGrabSelectionSessionOwner = exports.useGrabControllerState = exports.unregisterLocalGrabSelectionController = exports.registerLocalGrabSelectionController = void 0;
+exports.toggleGrabMenu = exports.enableGrabbing = exports.clearGrabOwnerPresentation = exports.hideGrabSelectionMenu = exports.showGrabSelectionMenu = exports.setGrabCapturing = exports.setGrabSelectionSessionOwner = exports.useGrabControllerState = exports.unregisterLocalGrabSelectionController = exports.registerLocalGrabSelectionController = void 0;
 const react_1 = require("react");
 const containers_1 = require("./containers");
 const localControllers = new Map();
 const listeners = new Set();
 let state = {
     isMenuVisible: false,
+    isCapturing: false,
     selectedOwnerId: null,
     selectionSessionOwnerId: null,
 };
@@ -55,6 +56,13 @@ const setGrabSelectionSessionOwner = (ownerId) => {
     }));
 };
 exports.setGrabSelectionSessionOwner = setGrabSelectionSessionOwner;
+const setGrabCapturing = (isCapturing) => {
+    setState((prevState) => ({
+        ...prevState,
+        isCapturing,
+    }));
+};
+exports.setGrabCapturing = setGrabCapturing;
 const showGrabSelectionMenu = (ownerId) => {
     setState((prevState) => ({
         ...prevState,
@@ -105,6 +113,7 @@ const toggleGrabMenu = () => {
             stopAllSelections();
             return {
                 isMenuVisible: false,
+                isCapturing: prevState.isCapturing,
                 selectedOwnerId: null,
                 selectionSessionOwnerId: null,
             };

@@ -5,6 +5,7 @@ type LocalGrabSelectionController = {
 };
 type GrabControllerState = {
     isMenuVisible: boolean;
+    isCapturing: boolean;
     selectedOwnerId: string | null;
     selectionSessionOwnerId: string | null;
 };
@@ -12,6 +13,7 @@ export declare const registerLocalGrabSelectionController: (ownerId: string, con
 export declare const unregisterLocalGrabSelectionController: (ownerId: string) => void;
 export declare const useGrabControllerState: () => GrabControllerState;
 export declare const setGrabSelectionSessionOwner: (ownerId: string | null) => void;
+export declare const setGrabCapturing: (isCapturing: boolean) => void;
 export declare const showGrabSelectionMenu: (ownerId: string) => void;
 export declare const hideGrabSelectionMenu: (ownerId: string) => void;
 export declare const clearGrabOwnerPresentation: (ownerId: string) => void;

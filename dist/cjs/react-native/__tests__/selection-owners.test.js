@@ -64,4 +64,29 @@ const registerOwner = (id, kind, nativeTag) => {
         (0, vitest_1.expect)((0, containers_1.getResolvedGrabSelectionOwnerId)()).toBe("screen");
     });
 });
+(0, vitest_1.describe)("getFocusedScreenName", () => {
+    (0, vitest_1.it)("follows focus changes between two named screens", () => {
+        registerOwner("root", "root", 1);
+        registerOwner("home", "screen", 2);
+        registerOwner("settings", "screen", 3);
+        (0, containers_1.setGrabSelectionOwnerName)("home", "Home");
+        (0, containers_1.setGrabSelectionOwnerName)("settings", "Settings");
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBeNull();
+        (0, containers_1.setGrabSelectionOwnerFocused)("home", true);
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBe("Home");
+        (0, containers_1.setGrabSelectionOwnerFocused)("settings", true);
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBe("Settings");
+        (0, containers_1.setGrabSelectionOwnerFocused)("settings", false);
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBeNull();
+        (0, containers_1.setGrabSelectionOwnerFocused)("home", true);
+        (0, containers_1.unregisterGrabSelectionOwner)("home");
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBeNull();
+    });
+    (0, vitest_1.it)("returns null for a focused screen without a name", () => {
+        registerOwner("root", "root", 1);
+        registerOwner("anonymous", "screen", 2);
+        (0, containers_1.setGrabSelectionOwnerFocused)("anonymous", true);
+        (0, vitest_1.expect)((0, containers_1.getFocusedScreenName)()).toBeNull();
+    });
+});
 //# sourceMappingURL=selection-owners.test.js.map

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.useIsResolvedGrabSelectionOwner = exports.getResolvedGrabSelectionOwnerId = exports.getResolvedGrabSelectionOwner = exports.getGrabSelectionOwner = exports.setGrabSelectionOwnerActive = exports.clearGrabSelectionOwnerFocus = exports.setGrabSelectionOwnerFocused = exports.unregisterGrabSelectionOwner = exports.registerGrabSelectionOwner = exports.createGrabSelectionOwnerId = void 0;
+exports.useIsResolvedGrabSelectionOwner = exports.getResolvedGrabSelectionOwnerId = exports.getResolvedGrabSelectionOwner = exports.getGrabSelectionOwner = exports.setGrabSelectionOwnerActive = exports.clearGrabSelectionOwnerFocus = exports.getFocusedScreenName = exports.setGrabSelectionOwnerName = exports.setGrabSelectionOwnerFocused = exports.unregisterGrabSelectionOwner = exports.registerGrabSelectionOwner = exports.createGrabSelectionOwnerId = void 0;
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const fabric_1 = require("./fabric");
@@ -62,6 +62,7 @@ const registerGrabSelectionOwner = (id, kind, ref) => {
     owners.set(id, {
         id,
         kind,
+        name: null,
         shadowNode,
         registrationOrder,
         activationOrder: null,
@@ -95,6 +96,22 @@ const setGrabSelectionOwnerFocused = (id, isFocused) => {
     notify();
 };
 exports.setGrabSelectionOwnerFocused = setGrabSelectionOwnerFocused;
+const setGrabSelectionOwnerName = (id, name) => {
+    const owner = owners.get(id);
+    if (!owner || owner.name === name) {
+        return;
+    }
+    owners.set(id, { ...owner, name });
+    notify();
+};
+exports.setGrabSelectionOwnerName = setGrabSelectionOwnerName;
+const getFocusedScreenName = () => {
+    if (focusedScreenOwnerId === null) {
+        return null;
+    }
+    return owners.get(focusedScreenOwnerId)?.name ?? null;
+};
+exports.getFocusedScreenName = getFocusedScreenName;
 const clearGrabSelectionOwnerFocus = (id) => {
     if (focusedScreenOwnerId !== id) {
         return;

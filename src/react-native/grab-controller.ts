@@ -9,6 +9,7 @@ type LocalGrabSelectionController = {
 
 type GrabControllerState = {
   isMenuVisible: boolean;
+  isCapturing: boolean;
   selectedOwnerId: string | null;
   selectionSessionOwnerId: string | null;
 };
@@ -18,6 +19,7 @@ const listeners = new Set<() => void>();
 
 let state: GrabControllerState = {
   isMenuVisible: false,
+  isCapturing: false,
   selectedOwnerId: null,
   selectionSessionOwnerId: null,
 };
@@ -82,6 +84,13 @@ export const setGrabSelectionSessionOwner = (ownerId: string | null) => {
   }));
 };
 
+export const setGrabCapturing = (isCapturing: boolean) => {
+  setState((prevState) => ({
+    ...prevState,
+    isCapturing,
+  }));
+};
+
 export const showGrabSelectionMenu = (ownerId: string) => {
   setState((prevState) => ({
     ...prevState,
@@ -140,6 +149,7 @@ export const toggleGrabMenu = () => {
       stopAllSelections();
       return {
         isMenuVisible: false,
+        isCapturing: prevState.isCapturing,
         selectedOwnerId: null,
         selectionSessionOwnerId: null,
       };

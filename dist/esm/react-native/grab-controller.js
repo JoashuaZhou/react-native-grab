@@ -4,6 +4,7 @@ const localControllers = new Map();
 const listeners = new Set();
 let state = {
     isMenuVisible: false,
+    isCapturing: false,
     selectedOwnerId: null,
     selectionSessionOwnerId: null,
 };
@@ -46,6 +47,12 @@ export const setGrabSelectionSessionOwner = (ownerId) => {
     setState((prevState) => ({
         ...prevState,
         selectionSessionOwnerId: ownerId,
+    }));
+};
+export const setGrabCapturing = (isCapturing) => {
+    setState((prevState) => ({
+        ...prevState,
+        isCapturing,
     }));
 };
 export const showGrabSelectionMenu = (ownerId) => {
@@ -94,6 +101,7 @@ export const toggleGrabMenu = () => {
             stopAllSelections();
             return {
                 isMenuVisible: false,
+                isCapturing: prevState.isCapturing,
                 selectedOwnerId: null,
                 selectionSessionOwnerId: null,
             };

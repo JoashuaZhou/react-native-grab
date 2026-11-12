@@ -58,6 +58,7 @@ export const registerGrabSelectionOwner = (id, kind, ref) => {
     owners.set(id, {
         id,
         kind,
+        name: null,
         shadowNode,
         registrationOrder,
         activationOrder: null,
@@ -87,6 +88,20 @@ export const setGrabSelectionOwnerFocused = (id, isFocused) => {
         focusedScreenOwnerId = null;
     }
     notify();
+};
+export const setGrabSelectionOwnerName = (id, name) => {
+    const owner = owners.get(id);
+    if (!owner || owner.name === name) {
+        return;
+    }
+    owners.set(id, { ...owner, name });
+    notify();
+};
+export const getFocusedScreenName = () => {
+    if (focusedScreenOwnerId === null) {
+        return null;
+    }
+    return owners.get(focusedScreenOwnerId)?.name ?? null;
 };
 export const clearGrabSelectionOwnerFocus = (id) => {
     if (focusedScreenOwnerId !== id) {

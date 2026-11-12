@@ -4,6 +4,7 @@ export type GrabSelectionOwnerKind = "root" | "screen" | "surface";
 export type GrabSelectionOwner = {
     id: string;
     kind: GrabSelectionOwnerKind;
+    name: string | null;
     shadowNode: ReactNativeShadowNode;
     registrationOrder: number;
     activationOrder: number | null;
@@ -12,6 +13,8 @@ export declare const createGrabSelectionOwnerId: (kind: GrabSelectionOwnerKind) 
 export declare const registerGrabSelectionOwner: (id: string, kind: GrabSelectionOwnerKind, ref: ReactNativeElement) => void;
 export declare const unregisterGrabSelectionOwner: (id: string) => void;
 export declare const setGrabSelectionOwnerFocused: (id: string, isFocused: boolean) => void;
+export declare const setGrabSelectionOwnerName: (id: string, name: string | null) => void;
+export declare const getFocusedScreenName: () => string | null;
 export declare const clearGrabSelectionOwnerFocus: (id: string) => void;
 export declare const setGrabSelectionOwnerActive: (id: string, isActive: boolean) => void;
 export declare const getGrabSelectionOwner: (id: string) => GrabSelectionOwner | null;

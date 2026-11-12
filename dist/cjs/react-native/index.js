@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setFocusEffect = exports.enableGrabbing = exports.ReactNativeGrabContextProvider = exports.ReactNativeGrabSurface = exports.ReactNativeGrabScreen = exports.ReactNativeGrabRoot = void 0;
+exports.configureReview = exports.setFocusEffect = exports.enableGrabbing = exports.ReactNativeGrabContextProvider = exports.ReactNativeGrabSurface = exports.ReactNativeGrabScreen = exports.ReactNativeGrabRoot = void 0;
 const noop = () => { };
 const Passthrough = ({ children }) => children;
 exports.ReactNativeGrabRoot = __DEV__
@@ -18,5 +18,8 @@ exports.enableGrabbing = __DEV__
     : noop;
 exports.setFocusEffect = __DEV__
     ? require("./focus-effect").setFocusEffect
+    : noop;
+exports.configureReview = __DEV__
+    ? require("./review/host").configureReview
     : noop;
 //# sourceMappingURL=index.js.map

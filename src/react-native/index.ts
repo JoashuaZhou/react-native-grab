@@ -2,6 +2,7 @@ import type { ReactNativeGrabRootProps } from "./grab-root";
 import type { ReactNativeGrabScreenProps } from "./grab-screen";
 import type { ReactNativeGrabSurfaceProps } from "./grab-surface";
 import type { ReactNativeGrabContextProviderProps } from "./grab-context";
+import type { ReviewHost, ReviewScreenshot } from "./review/host";
 import type { ReactNode } from "react";
 
 export type { ReactNativeGrabRootProps } from "./grab-root";
@@ -11,6 +12,7 @@ export type {
   ReactNativeGrabContextProviderProps,
   ReactNativeGrabContextValue,
 } from "./grab-context";
+export type { ReviewHost, ReviewScreenshot } from "./review/host";
 
 const noop = () => {};
 const Passthrough = ({ children }: { children?: ReactNode }) => children;
@@ -36,4 +38,8 @@ export const enableGrabbing: () => void = __DEV__
 
 export const setFocusEffect: (impl: (cb: () => void) => void) => void = __DEV__
   ? require("./focus-effect").setFocusEffect
+  : noop;
+
+export const configureReview: (host: ReviewHost) => void = __DEV__
+  ? require("./review/host").configureReview
   : noop;

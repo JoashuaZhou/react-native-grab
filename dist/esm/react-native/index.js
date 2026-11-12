@@ -16,4 +16,7 @@ export const enableGrabbing = __DEV__
 export const setFocusEffect = __DEV__
     ? require("./focus-effect").setFocusEffect
     : noop;
+export const configureReview = __DEV__
+    ? require("./review/host").configureReview
+    : noop;
 //# sourceMappingURL=index.js.map

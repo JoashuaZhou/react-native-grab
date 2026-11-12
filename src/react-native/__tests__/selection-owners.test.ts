@@ -13,10 +13,12 @@ vi.mock("../fabric", () => ({
 
 import {
   clearGrabSelectionOwnerFocus,
+  getFocusedScreenName,
   getResolvedGrabSelectionOwnerId,
   registerGrabSelectionOwner,
   setGrabSelectionOwnerActive,
   setGrabSelectionOwnerFocused,
+  setGrabSelectionOwnerName,
   unregisterGrabSelectionOwner,
 } from "../containers";
 
@@ -88,5 +90,38 @@ describe("grab selection owner resolution", () => {
     // A stale activation for the unmounted surface must not resurrect it.
     setGrabSelectionOwnerActive("sheet", true);
     expect(getResolvedGrabSelectionOwnerId()).toBe("screen");
+  });
+});
+
+describe("getFocusedScreenName", () => {
+  it("follows focus changes between two named screens", () => {
+    registerOwner("root", "root", 1);
+    registerOwner("home", "screen", 2);
+    registerOwner("settings", "screen", 3);
+    setGrabSelectionOwnerName("home", "Home");
+    setGrabSelectionOwnerName("settings", "Settings");
+
+    expect(getFocusedScreenName()).toBeNull();
+
+    setGrabSelectionOwnerFocused("home", true);
+    expect(getFocusedScreenName()).toBe("Home");
+
+    setGrabSelectionOwnerFocused("settings", true);
+    expect(getFocusedScreenName()).toBe("Settings");
+
+    setGrabSelectionOwnerFocused("settings", false);
+    expect(getFocusedScreenName()).toBeNull();
+
+    setGrabSelectionOwnerFocused("home", true);
+    unregisterGrabSelectionOwner("home");
+    expect(getFocusedScreenName()).toBeNull();
+  });
+
+  it("returns null for a focused screen without a name", () => {
+    registerOwner("root", "root", 1);
+    registerOwner("anonymous", "screen", 2);
+    setGrabSelectionOwnerFocused("anonymous", true);
+
+    expect(getFocusedScreenName()).toBeNull();
   });
 });
