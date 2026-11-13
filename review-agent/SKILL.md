@@ -28,7 +28,7 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
    - JSON 文件：用 `npx rn-grab-review check-json <改动文件>...` 校验。
    - 文案（i18n）类改动：存在相关测试时运行，例如 `yarn test src/page/Plugin/keenetic/__tests__/i18nKeys.test.js`。
    - 每条都跑 `node scripts/ai/check.js`。
-   随后 stage 本条改动的文件：`git add <本条修改的文件>`，用明确路径逐个添加，不要用 `git add -A`，也不要用 `git add .`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
+     随后 stage 本条改动的文件：`git add <本条修改的文件>`，用明确路径逐个添加，不要用 `git add -A`，也不要用 `git add .`；每条一个 commit，message 为 `fix(design-review): #<no> <中文简述>`，须通过 `node scripts/ai/check-commit-msg.js` 校验。范围为「改公共组件」的条目，commit subject 必须包含「公共组件」。
 5. `npx rn-grab-review reply <no> --message "<中文回复>" --commit <sha>` 回复，然后处理下一条。
 
 ## 3. 范围与禁区
@@ -59,6 +59,7 @@ description: 视觉走查修复流程：定位代码、修改、验证、提交�
    - 每一轮的描述、回复和 commit，逐轮取自 item 输出。
 
    并单独分节列出涉及公共组件的条目、未修复（需要人工处理）的条目和已撤销的条目。
+
 5. 执行 `npx rn-grab-review complete --mr <MR 链接>`。
 
 ## 6. 禁止

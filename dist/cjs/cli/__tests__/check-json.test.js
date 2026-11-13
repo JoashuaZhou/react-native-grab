@@ -55,9 +55,7 @@ const check_json_1 = require("../check-json");
         writeIn("truncated.json", '{"a":');
         const ok = (0, check_json_1.runCheckJson)(["truncated.json"], { cwd: root, print });
         (0, vitest_1.expect)(ok).toBe(false);
-        (0, vitest_1.expect)(lines).toEqual([
-            "truncated.json：JSON 无效：Unexpected end of JSON input（位置 5）",
-        ]);
+        (0, vitest_1.expect)(lines).toEqual(["truncated.json：JSON 无效：Unexpected end of JSON input（位置 5）"]);
     });
     (0, vitest_1.it)("reports the end-of-input position for a truncated literal", () => {
         writeIn("nullish.json", "nul");
@@ -118,6 +116,72 @@ const check_json_1 = require("../check-json");
         (0, vitest_1.expect)(lines[0]).toMatch(/^subdir：无法读取：/);
     });
 });
+(0, vitest_1.describe)("accurate positions for positionless parse failures (review F1/F2)", () => {
+    let root;
+    let lines;
+    (0, vitest_1.beforeEach)(() => {
+        root = (0, node_fs_1.mkdtempSync)((0, node_path_1.join)((0, node_os_1.tmpdir)(), "rn-grab-check-json-f1f2-"));
+        lines = [];
+    });
+    (0, vitest_1.afterEach)(() => {
+        (0, node_fs_1.rmSync)(root, { recursive: true, force: true });
+    });
+    const print = (line) => {
+        lines.push(line);
+    };
+    const writeIn = (name, content) => {
+        const file = (0, node_path_1.join)(root, name);
+        (0, node_fs_1.writeFileSync)(file, content, "utf8");
+        return file;
+    };
+    (0, vitest_1.it)("reports the offending comma when an earlier comma exists (F1)", () => {
+        // The parse stops at the comma after "b": (index 14), not the first
+        // comma (index 8) that a first-occurrence lookup would report.
+        writeIn("f1.json", '{"a":"x", "b":,}');
+        const ok = (0, check_json_1.runCheckJson)(["f1.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^f1\.json：JSON 无效：.+（位置 14）$/);
+    });
+    (0, vitest_1.it)("reports the second comma of an empty array element, not the first", () => {
+        // [1,2,,3]: the grammar fails at the comma starting the empty element
+        // (index 5); the earlier element separators sit at 2 and 4.
+        writeIn("repeated.json", "[1,2,,3]");
+        const ok = (0, check_json_1.runCheckJson)(["repeated.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^repeated\.json：JSON 无效：.+（位置 5）$/);
+    });
+    (0, vitest_1.it)("reports position zero when the input echoes position-like text (F2)", () => {
+        // The V8 message embeds the document "position 5 not json"; its text
+        // must not be mistaken for a diagnostic position. The offending token
+        // is 'p' at index 0.
+        writeIn("f2.json", "position 5 not json");
+        const ok = (0, check_json_1.runCheckJson)(["f2.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^f2\.json：JSON 无效：.+（位置 0）$/);
+    });
+    (0, vitest_1.it)("reports position zero when the input echoes at-position-like text", () => {
+        // "at position 99" is echoed document text; the offending token is
+        // 'a' at index 0.
+        writeIn("f2b.json", "at position 99");
+        const ok = (0, check_json_1.runCheckJson)(["f2b.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^f2b\.json：JSON 无效：.+（位置 0）$/);
+    });
+    (0, vitest_1.it)("keeps the real failure position when a property name contains position-like text", () => {
+        // The echoed document contains "position 5"; the parse actually stops
+        // at the '}' that should have been a value (index 15).
+        writeIn("f2c.json", '{"position 5": }');
+        const ok = (0, check_json_1.runCheckJson)(["f2c.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^f2c\.json：JSON 无效：.+（位置 15）$/);
+    });
+    (0, vitest_1.it)("keeps the end-of-input position for EOF failures", () => {
+        writeIn("eof.json", '{"a":');
+        const ok = (0, check_json_1.runCheckJson)(["eof.json"], { cwd: root, print });
+        (0, vitest_1.expect)(ok).toBe(false);
+        (0, vitest_1.expect)(lines[0]).toMatch(/^eof\.json：JSON 无效：Unexpected end of JSON input（位置 5）$/);
+    });
+});
 (0, vitest_1.describe)("rn-grab-review check-json (CLI integration)", () => {
     const cli = (0, node_path_1.resolve)(process.cwd(), "dist", "cjs", "cli", "review.js");
     let root;
@@ -161,6 +225,18 @@ const check_json_1 = require("../check-json");
         const result = runCli(["truncated.json"]);
         (0, vitest_1.expect)(result.status).toBe(1);
         (0, vitest_1.expect)(result.stdout).toMatch(/^truncated\.json：JSON 无效：Unexpected end of JSON input（位置 5）$/m);
+    });
+    (0, vitest_1.it)("exits 1 with the exact offending position when the token recurs earlier (F1)", () => {
+        writeIn("f1.json", '{"a":"x", "b":,}');
+        const result = runCli(["f1.json"]);
+        (0, vitest_1.expect)(result.status).toBe(1);
+        (0, vitest_1.expect)(result.stdout).toMatch(/^f1\.json：JSON 无效：.+（位置 14）$/m);
+    });
+    (0, vitest_1.it)("exits 1 with position zero when the input echoes position-like text (F2)", () => {
+        writeIn("f2.json", "position 5 not json");
+        const result = runCli(["f2.json"]);
+        (0, vitest_1.expect)(result.status).toBe(1);
+        (0, vitest_1.expect)(result.stdout).toMatch(/^f2\.json：JSON 无效：.+（位置 0）$/m);
     });
     (0, vitest_1.it)("exits 1 and rejects a path outside the working directory", () => {
         const secret = (0, node_path_1.join)(outside, "secret.json");

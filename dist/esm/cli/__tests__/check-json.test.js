@@ -53,9 +53,7 @@ describe("runCheckJson", () => {
         writeIn("truncated.json", '{"a":');
         const ok = runCheckJson(["truncated.json"], { cwd: root, print });
         expect(ok).toBe(false);
-        expect(lines).toEqual([
-            "truncated.json：JSON 无效：Unexpected end of JSON input（位置 5）",
-        ]);
+        expect(lines).toEqual(["truncated.json：JSON 无效：Unexpected end of JSON input（位置 5）"]);
     });
     it("reports the end-of-input position for a truncated literal", () => {
         writeIn("nullish.json", "nul");
@@ -116,6 +114,72 @@ describe("runCheckJson", () => {
         expect(lines[0]).toMatch(/^subdir：无法读取：/);
     });
 });
+describe("accurate positions for positionless parse failures (review F1/F2)", () => {
+    let root;
+    let lines;
+    beforeEach(() => {
+        root = mkdtempSync(join(tmpdir(), "rn-grab-check-json-f1f2-"));
+        lines = [];
+    });
+    afterEach(() => {
+        rmSync(root, { recursive: true, force: true });
+    });
+    const print = (line) => {
+        lines.push(line);
+    };
+    const writeIn = (name, content) => {
+        const file = join(root, name);
+        writeFileSync(file, content, "utf8");
+        return file;
+    };
+    it("reports the offending comma when an earlier comma exists (F1)", () => {
+        // The parse stops at the comma after "b": (index 14), not the first
+        // comma (index 8) that a first-occurrence lookup would report.
+        writeIn("f1.json", '{"a":"x", "b":,}');
+        const ok = runCheckJson(["f1.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^f1\.json：JSON 无效：.+（位置 14）$/);
+    });
+    it("reports the second comma of an empty array element, not the first", () => {
+        // [1,2,,3]: the grammar fails at the comma starting the empty element
+        // (index 5); the earlier element separators sit at 2 and 4.
+        writeIn("repeated.json", "[1,2,,3]");
+        const ok = runCheckJson(["repeated.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^repeated\.json：JSON 无效：.+（位置 5）$/);
+    });
+    it("reports position zero when the input echoes position-like text (F2)", () => {
+        // The V8 message embeds the document "position 5 not json"; its text
+        // must not be mistaken for a diagnostic position. The offending token
+        // is 'p' at index 0.
+        writeIn("f2.json", "position 5 not json");
+        const ok = runCheckJson(["f2.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^f2\.json：JSON 无效：.+（位置 0）$/);
+    });
+    it("reports position zero when the input echoes at-position-like text", () => {
+        // "at position 99" is echoed document text; the offending token is
+        // 'a' at index 0.
+        writeIn("f2b.json", "at position 99");
+        const ok = runCheckJson(["f2b.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^f2b\.json：JSON 无效：.+（位置 0）$/);
+    });
+    it("keeps the real failure position when a property name contains position-like text", () => {
+        // The echoed document contains "position 5"; the parse actually stops
+        // at the '}' that should have been a value (index 15).
+        writeIn("f2c.json", '{"position 5": }');
+        const ok = runCheckJson(["f2c.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^f2c\.json：JSON 无效：.+（位置 15）$/);
+    });
+    it("keeps the end-of-input position for EOF failures", () => {
+        writeIn("eof.json", '{"a":');
+        const ok = runCheckJson(["eof.json"], { cwd: root, print });
+        expect(ok).toBe(false);
+        expect(lines[0]).toMatch(/^eof\.json：JSON 无效：Unexpected end of JSON input（位置 5）$/);
+    });
+});
 describe("rn-grab-review check-json (CLI integration)", () => {
     const cli = resolve(process.cwd(), "dist", "cjs", "cli", "review.js");
     let root;
@@ -159,6 +223,18 @@ describe("rn-grab-review check-json (CLI integration)", () => {
         const result = runCli(["truncated.json"]);
         expect(result.status).toBe(1);
         expect(result.stdout).toMatch(/^truncated\.json：JSON 无效：Unexpected end of JSON input（位置 5）$/m);
+    });
+    it("exits 1 with the exact offending position when the token recurs earlier (F1)", () => {
+        writeIn("f1.json", '{"a":"x", "b":,}');
+        const result = runCli(["f1.json"]);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toMatch(/^f1\.json：JSON 无效：.+（位置 14）$/m);
+    });
+    it("exits 1 with position zero when the input echoes position-like text (F2)", () => {
+        writeIn("f2.json", "position 5 not json");
+        const result = runCli(["f2.json"]);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toMatch(/^f2\.json：JSON 无效：.+（位置 0）$/m);
     });
     it("exits 1 and rejects a path outside the working directory", () => {
         const secret = join(outside, "secret.json");
