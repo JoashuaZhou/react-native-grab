@@ -4,11 +4,13 @@ import {
   createGrabSelectionOwnerId,
   registerGrabSelectionOwner,
   unregisterGrabSelectionOwner,
+  useIsActiveGrabSurfaceOwner,
   useIsResolvedGrabSelectionOwner,
   type GrabSelectionOwnerKind,
 } from "./containers";
 import { GrabOwnerControls } from "./grab-controls";
 import { ReactNativeGrabOverlay } from "./grab-overlay";
+import { SurfaceComposerSlot } from "./review/composer";
 
 /** Root and screen owners always fill their parent; surfaces are sized by their host. */
 export const grabSelectionOwnerFillStyle = { flex: 1 } as const;
@@ -51,6 +53,10 @@ export const GrabSelectionOwnerView = ({
   // The controls belong to whichever owner resolves selection, so that they are
   // rendered in the same native window as the content they act on.
   const isResolvedSelectionOwner = useIsResolvedGrabSelectionOwner(ownerId);
+  // Only the ACTIVE surface hosts the shared composer sheet; when several
+  // surfaces exist the registry hands it to the topmost activated one, the
+  // same resolution that owns selection.
+  const isActiveSurface = useIsActiveGrabSurfaceOwner(ownerId);
 
   return (
     <>
@@ -68,6 +74,13 @@ export const GrabSelectionOwnerView = ({
         resolves each grab to the owner itself.
       */}
       {isResolvedSelectionOwner && <GrabOwnerControls />}
+
+      {/*
+        A surface inside an app RN Modal cannot present another native Modal
+        above it on iOS, so the review sheet rides the surface's own Modal
+        subtree as an overlay (see SurfaceComposerSlot in review/composer.tsx).
+      */}
+      {isActiveSurface && <SurfaceComposerSlot />}
     </>
   );
 };

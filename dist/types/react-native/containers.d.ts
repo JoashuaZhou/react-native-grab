@@ -21,4 +21,12 @@ export declare const getGrabSelectionOwner: (id: string) => GrabSelectionOwner |
 export declare const getResolvedGrabSelectionOwner: () => GrabSelectionOwner | null;
 export declare const getResolvedGrabSelectionOwnerId: () => string | null;
 export declare const useIsResolvedGrabSelectionOwner: (id: string) => boolean;
+export declare const getActiveGrabSurfaceOwnerId: () => string | null;
+/**
+ * True while any grab surface (an app-owned RN Modal subtree) is activated.
+ * Hosting components use it to never present a second native Modal over the
+ * app's presented one.
+ */
+export declare const useHasActiveGrabSurface: () => boolean;
+export declare const useIsActiveGrabSurfaceOwner: (id: string) => boolean;
 //# sourceMappingURL=containers.d.ts.map

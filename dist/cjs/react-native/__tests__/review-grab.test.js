@@ -129,6 +129,7 @@ vitest_1.vi.mock("react-native-safe-area-context", () => ({
 vitest_1.vi.mock("../containers", () => ({
     getGrabSelectionOwner: () => ({ shadowNode: {} }),
     getFocusedScreenName: () => runtime.route,
+    useHasActiveGrabSurface: () => false,
     useIsResolvedGrabSelectionOwner: () => true,
 }));
 vitest_1.vi.mock("../measure", () => ({

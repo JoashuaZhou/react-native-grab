@@ -46,6 +46,11 @@ vi.mock("../store", () => ({
     },
     useReviewState: () => runtime.reviewState,
 }));
+// The root composer suppresses itself while a grab surface is active; these
+// root-path tests run with no surface registered.
+vi.mock("../../containers", () => ({
+    useHasActiveGrabSurface: () => false,
+}));
 import { ComposerSheet, ReviewComposer } from "../composer";
 import { ReviewListPanel } from "../list-panel";
 const asElement = (value) => value;

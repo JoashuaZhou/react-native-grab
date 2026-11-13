@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReviewComposer = exports.ComposerSheet = void 0;
+exports.ReviewComposer = exports.SurfaceComposerSlot = exports.ComposerSheet = void 0;
 const jsx_runtime_1 = require("react/jsx-runtime");
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const react_native_safe_area_context_1 = require("react-native-safe-area-context");
 const types_1 = require("../../review-core/types");
+const containers_1 = require("../containers");
 const store_1 = require("./store");
 const thumbnail_1 = require("./thumbnail");
 const view_model_1 = require("./view-model");
@@ -13,6 +14,15 @@ const NO_SCREENSHOT_HINT = "未截图：请安装包含走查截图功能的测�
 const captureSource = (screenshot) => ({
     uri: `data:image/jpeg;base64,${screenshot.jpegBase64}`,
 });
+let sheetFormCache = null;
+const restoreSheetForm = (composer) => {
+    if (sheetFormCache?.composer === composer) {
+        return sheetFormCache.form;
+    }
+    const form = toFormState(composer);
+    sheetFormCache = { composer, form };
+    return form;
+};
 const toFormState = (composer) => {
     if (composer.mode === "create") {
         const draft = composer.draft;
@@ -45,16 +55,25 @@ const toErrorText = (error) => {
     return `保存失败（${error.code}），请重试`;
 };
 const ComposerSheet = ({ composer, error, }) => {
-    const [form, setForm] = (0, react_1.useState)(() => toFormState(composer));
+    const [form, setForm] = (0, react_1.useState)(() => restoreSheetForm(composer));
     const [lastComposer, setLastComposer] = (0, react_1.useState)(composer);
     const [isSaving, setIsSaving] = (0, react_1.useState)(false);
     // A fresh composer object means a new sheet; the form resets during render
     // so no stale draft ever flashes.
     if (lastComposer !== composer) {
         setLastComposer(composer);
-        setForm(toFormState(composer));
+        setForm(restoreSheetForm(composer));
         setIsSaving(false);
     }
+    const updateForm = (patch) => {
+        setForm((previous) => {
+            const form = patch(previous);
+            // Stash the typed form against this composer so the sheet can move to
+            // another host (surface deactivation/unmount) without losing the draft.
+            sheetFormCache = { composer, form };
+            return form;
+        });
+    };
     const canSave = composer.mode === "reject"
         ? form.supplement.trim().length > 0
         : (0, view_model_1.canSaveComposer)({ description: form.description });
@@ -90,10 +109,10 @@ const ComposerSheet = ({ composer, error, }) => {
                     if (!isSaving) {
                         store_1.reviewActions.closeComposer();
                     }
-                }, style: styles.backdropPress }), (0, jsx_runtime_1.jsx)(react_native_1.ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.sheet, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : ((0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: [
+                }, style: styles.backdropPress }), (0, jsx_runtime_1.jsx)(react_native_1.ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.sheet, children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : ((0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => updateForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), (0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { onPress: () => updateForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: [
                                                 styles.scopeChipText,
                                                 form.scope === scope && styles.scopeChipTextActive,
-                                            ], children: types_1.SCOPE_LABELS[scope] }) }, scope))) }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => setForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.errorText, children: toErrorText(error) })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.actionRow, children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { disabled: isSaving, onPress: store_1.reviewActions.closeComposer, style: ({ pressed }) => [
+                                            ], children: types_1.SCOPE_LABELS[scope] }) }, scope))) }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => updateForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), (0, jsx_runtime_1.jsx)(react_native_1.TextInput, { multiline: true, onChangeText: (text) => updateForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && ((0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.errorText, children: toErrorText(error) })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.actionRow, children: [(0, jsx_runtime_1.jsx)(react_native_1.Pressable, { disabled: isSaving, onPress: store_1.reviewActions.closeComposer, style: ({ pressed }) => [
                                         styles.actionButton,
                                         styles.actionButtonSecondary,
                                         pressed && styles.actionButtonPressed,
@@ -108,11 +127,28 @@ const ComposerSheet = ({ composer, error, }) => {
                                         ], children: toSaveLabel(composer) }) })] })] }) })] }));
 };
 exports.ComposerSheet = ComposerSheet;
+/**
+ * Hosts the sheet inside the ACTIVE grab surface's owner tree - an app-owned
+ * RN Modal subtree - as an overlay sibling of the surface view, so picking
+ * inside a presented app dialog never presents a second native Modal.
+ */
+const SurfaceComposerSlot = () => {
+    const { composer, error, listVisible } = (0, store_1.useReviewState)();
+    if (listVisible || composer === null) {
+        return null;
+    }
+    return ((0, jsx_runtime_1.jsx)(react_native_1.View, { style: styles.surfaceOverlay, children: (0, jsx_runtime_1.jsx)(exports.ComposerSheet, { composer: composer, error: error }) }));
+};
+exports.SurfaceComposerSlot = SurfaceComposerSlot;
 const ReviewComposer = () => {
     const { composer, error, listVisible } = (0, store_1.useReviewState)();
-    // iOS cannot present a second Modal over the full-screen list; while the
-    // list is visible the sheet mounts inside the list Modal tree instead.
-    if (listVisible) {
+    const hasActiveGrabSurface = (0, containers_1.useHasActiveGrabSurface)();
+    // iOS drops a second RN Modal presented over an already presented one and
+    // keeps an invisible full-screen host as a touch sink. The sheet therefore
+    // mounts in exactly one host at a time - the list Modal tree while the list
+    // is visible, the active grab surface's overlay otherwise, and this root
+    // Modal only when it is the single host left.
+    if (listVisible || hasActiveGrabSurface) {
         return null;
     }
     return ((0, jsx_runtime_1.jsx)(react_native_1.Modal, { animationType: "slide", onRequestClose: store_1.reviewActions.closeComposer, transparent: true, visible: composer !== null, children: composer !== null && (0, jsx_runtime_1.jsx)(exports.ComposerSheet, { composer: composer, error: error }) }));
@@ -126,6 +162,10 @@ const styles = react_native_1.StyleSheet.create({
     },
     backdropPress: {
         flex: 1,
+    },
+    surfaceOverlay: {
+        ...react_native_1.StyleSheet.absoluteFill,
+        zIndex: 9999,
     },
     sheetContent: {
         justifyContent: "flex-end",

@@ -64,6 +64,39 @@ const registerOwner = (id, kind, nativeTag) => {
         (0, vitest_1.expect)((0, containers_1.getResolvedGrabSelectionOwnerId)()).toBe("screen");
     });
 });
+(0, vitest_1.describe)("active grab surface host", () => {
+    (0, vitest_1.it)("tracks the topmost activated surface for shared sheet hosting", () => {
+        registerOwner("root", "root", 1);
+        registerOwner("bottom-sheet", "surface", 2);
+        registerOwner("top-sheet", "surface", 3);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBeNull();
+        (0, containers_1.setGrabSelectionOwnerActive)("bottom-sheet", true);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBe("bottom-sheet");
+        (0, containers_1.setGrabSelectionOwnerActive)("top-sheet", true);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBe("top-sheet");
+        // Deactivating the top surface hands hosting back to the one beneath.
+        (0, containers_1.setGrabSelectionOwnerActive)("top-sheet", false);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBe("bottom-sheet");
+        (0, containers_1.unregisterGrabSelectionOwner)("bottom-sheet");
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBeNull();
+    });
+    (0, vitest_1.it)("never lets a stale activation resurrect an unmounted surface as host", () => {
+        registerOwner("root", "root", 1);
+        registerOwner("sheet", "surface", 2);
+        (0, containers_1.setGrabSelectionOwnerActive)("sheet", true);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBe("sheet");
+        (0, containers_1.unregisterGrabSelectionOwner)("sheet");
+        (0, containers_1.setGrabSelectionOwnerActive)("sheet", true);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBeNull();
+    });
+    (0, vitest_1.it)("ignores activation attempts for owners that are not surfaces", () => {
+        registerOwner("root", "root", 1);
+        registerOwner("screen", "screen", 2);
+        (0, containers_1.setGrabSelectionOwnerActive)("screen", true);
+        (0, containers_1.setGrabSelectionOwnerActive)("root", true);
+        (0, vitest_1.expect)((0, containers_1.getActiveGrabSurfaceOwnerId)()).toBeNull();
+    });
+});
 (0, vitest_1.describe)("getFocusedScreenName", () => {
     (0, vitest_1.it)("follows focus changes between two named screens", () => {
         registerOwner("root", "root", 1);

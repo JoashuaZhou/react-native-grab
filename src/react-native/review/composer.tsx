@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
 import { SCOPE_LABELS, type ItemScope } from "../../review-core/types";
+import { useHasActiveGrabSurface } from "../containers";
 import { type ReviewApiError } from "./api";
 import { type ReviewScreenshot } from "./host";
 import { reviewActions, useReviewState, type ComposerState } from "./store";
@@ -29,6 +30,24 @@ type FormState = {
   scope: ItemScope;
   figmaUrl: string;
   supplement: string;
+};
+
+// The sheet keeps its typed form while it moves between hosts (surface
+// overlay -> list -> root Modal): the committed form is stashed against the
+// store's composer object, so an identical composer restores it but a new
+// composer starts fresh, matching the render-time reset below.
+type SheetFormCache = { composer: ComposerState; form: FormState } | null;
+
+let sheetFormCache: SheetFormCache = null;
+
+const restoreSheetForm = (composer: ComposerState): FormState => {
+  if (sheetFormCache?.composer === composer) {
+    return sheetFormCache.form;
+  }
+
+  const form = toFormState(composer);
+  sheetFormCache = { composer, form };
+  return form;
 };
 
 const toFormState = (composer: ComposerState): FormState => {
@@ -75,7 +94,7 @@ export const ComposerSheet = ({
   composer: ComposerState;
   error: ReviewApiError | null;
 }) => {
-  const [form, setForm] = useState<FormState>(() => toFormState(composer));
+  const [form, setForm] = useState<FormState>(() => restoreSheetForm(composer));
   const [lastComposer, setLastComposer] = useState<ComposerState | null>(composer);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -83,9 +102,19 @@ export const ComposerSheet = ({
   // so no stale draft ever flashes.
   if (lastComposer !== composer) {
     setLastComposer(composer);
-    setForm(toFormState(composer));
+    setForm(restoreSheetForm(composer));
     setIsSaving(false);
   }
+
+  const updateForm = (patch: (previous: FormState) => FormState) => {
+    setForm((previous) => {
+      const form = patch(previous);
+      // Stash the typed form against this composer so the sheet can move to
+      // another host (surface deactivation/unmount) without losing the draft.
+      sheetFormCache = { composer, form };
+      return form;
+    });
+  };
 
   const canSave =
     composer.mode === "reject"
@@ -157,7 +186,7 @@ export const ComposerSheet = ({
               <Text style={styles.fieldLabel}>描述</Text>
               <TextInput
                 multiline
-                onChangeText={(text) => setForm((prev) => ({ ...prev, description: text }))}
+                onChangeText={(text) => updateForm((prev) => ({ ...prev, description: text }))}
                 placeholder="描述（必填）"
                 style={styles.textInput}
                 textAlignVertical="top"
@@ -169,7 +198,7 @@ export const ComposerSheet = ({
                 {(["local", "shared"] as const).map((scope) => (
                   <Pressable
                     key={scope}
-                    onPress={() => setForm((prev) => ({ ...prev, scope }))}
+                    onPress={() => updateForm((prev) => ({ ...prev, scope }))}
                     style={[styles.scopeChip, form.scope === scope && styles.scopeChipActive]}
                   >
                     <Text
@@ -188,7 +217,7 @@ export const ComposerSheet = ({
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
-                onChangeText={(text) => setForm((prev) => ({ ...prev, figmaUrl: text }))}
+                onChangeText={(text) => updateForm((prev) => ({ ...prev, figmaUrl: text }))}
                 keyboardType="url"
                 placeholder="Figma 链接（选填）"
                 style={styles.textInput}
@@ -200,7 +229,7 @@ export const ComposerSheet = ({
               <Text style={styles.fieldLabel}>补充说明</Text>
               <TextInput
                 multiline
-                onChangeText={(text) => setForm((prev) => ({ ...prev, supplement: text }))}
+                onChangeText={(text) => updateForm((prev) => ({ ...prev, supplement: text }))}
                 placeholder="补充说明（必填）"
                 style={[styles.textInput, styles.supplementInput]}
                 textAlignVertical="top"
@@ -251,12 +280,35 @@ export const ComposerSheet = ({
   );
 };
 
-export const ReviewComposer = () => {
+/**
+ * Hosts the sheet inside the ACTIVE grab surface's owner tree - an app-owned
+ * RN Modal subtree - as an overlay sibling of the surface view, so picking
+ * inside a presented app dialog never presents a second native Modal.
+ */
+export const SurfaceComposerSlot = () => {
   const { composer, error, listVisible } = useReviewState();
 
-  // iOS cannot present a second Modal over the full-screen list; while the
-  // list is visible the sheet mounts inside the list Modal tree instead.
-  if (listVisible) {
+  if (listVisible || composer === null) {
+    return null;
+  }
+
+  return (
+    <View style={styles.surfaceOverlay}>
+      <ComposerSheet composer={composer} error={error} />
+    </View>
+  );
+};
+
+export const ReviewComposer = () => {
+  const { composer, error, listVisible } = useReviewState();
+  const hasActiveGrabSurface = useHasActiveGrabSurface();
+
+  // iOS drops a second RN Modal presented over an already presented one and
+  // keeps an invisible full-screen host as a touch sink. The sheet therefore
+  // mounts in exactly one host at a time - the list Modal tree while the list
+  // is visible, the active grab surface's overlay otherwise, and this root
+  // Modal only when it is the single host left.
+  if (listVisible || hasActiveGrabSurface) {
     return null;
   }
 
@@ -280,6 +332,10 @@ const styles = StyleSheet.create({
   },
   backdropPress: {
     flex: 1,
+  },
+  surfaceOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 9999,
   },
   sheetContent: {
     justifyContent: "flex-end",

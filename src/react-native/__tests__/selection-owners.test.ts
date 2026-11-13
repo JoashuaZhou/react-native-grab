@@ -13,6 +13,7 @@ vi.mock("../fabric", () => ({
 
 import {
   clearGrabSelectionOwnerFocus,
+  getActiveGrabSurfaceOwnerId,
   getFocusedScreenName,
   getResolvedGrabSelectionOwnerId,
   registerGrabSelectionOwner,
@@ -90,6 +91,49 @@ describe("grab selection owner resolution", () => {
     // A stale activation for the unmounted surface must not resurrect it.
     setGrabSelectionOwnerActive("sheet", true);
     expect(getResolvedGrabSelectionOwnerId()).toBe("screen");
+  });
+});
+
+describe("active grab surface host", () => {
+  it("tracks the topmost activated surface for shared sheet hosting", () => {
+    registerOwner("root", "root", 1);
+    registerOwner("bottom-sheet", "surface", 2);
+    registerOwner("top-sheet", "surface", 3);
+    expect(getActiveGrabSurfaceOwnerId()).toBeNull();
+
+    setGrabSelectionOwnerActive("bottom-sheet", true);
+    expect(getActiveGrabSurfaceOwnerId()).toBe("bottom-sheet");
+
+    setGrabSelectionOwnerActive("top-sheet", true);
+    expect(getActiveGrabSurfaceOwnerId()).toBe("top-sheet");
+
+    // Deactivating the top surface hands hosting back to the one beneath.
+    setGrabSelectionOwnerActive("top-sheet", false);
+    expect(getActiveGrabSurfaceOwnerId()).toBe("bottom-sheet");
+
+    unregisterGrabSelectionOwner("bottom-sheet");
+    expect(getActiveGrabSurfaceOwnerId()).toBeNull();
+  });
+
+  it("never lets a stale activation resurrect an unmounted surface as host", () => {
+    registerOwner("root", "root", 1);
+    registerOwner("sheet", "surface", 2);
+    setGrabSelectionOwnerActive("sheet", true);
+    expect(getActiveGrabSurfaceOwnerId()).toBe("sheet");
+
+    unregisterGrabSelectionOwner("sheet");
+    setGrabSelectionOwnerActive("sheet", true);
+    expect(getActiveGrabSurfaceOwnerId()).toBeNull();
+  });
+
+  it("ignores activation attempts for owners that are not surfaces", () => {
+    registerOwner("root", "root", 1);
+    registerOwner("screen", "screen", 2);
+
+    setGrabSelectionOwnerActive("screen", true);
+    setGrabSelectionOwnerActive("root", true);
+
+    expect(getActiveGrabSurfaceOwnerId()).toBeNull();
   });
 });
 

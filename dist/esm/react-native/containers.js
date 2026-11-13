@@ -149,4 +149,18 @@ export const getResolvedGrabSelectionOwnerId = () => {
 export const useIsResolvedGrabSelectionOwner = (id) => {
     return useSyncExternalStore(subscribe, () => getResolvedGrabSelectionOwnerId() === id, () => false);
 };
+export const getActiveGrabSurfaceOwnerId = () => {
+    return getActiveSurfaceOwner()?.id ?? null;
+};
+/**
+ * True while any grab surface (an app-owned RN Modal subtree) is activated.
+ * Hosting components use it to never present a second native Modal over the
+ * app's presented one.
+ */
+export const useHasActiveGrabSurface = () => {
+    return useSyncExternalStore(subscribe, () => getActiveSurfaceOwner() !== null, () => false);
+};
+export const useIsActiveGrabSurfaceOwner = (id) => {
+    return useSyncExternalStore(subscribe, () => getActiveSurfaceOwner()?.id === id, () => false);
+};
 //# sourceMappingURL=containers.js.map

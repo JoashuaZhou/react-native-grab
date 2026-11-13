@@ -3,6 +3,7 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
 import { SCOPE_LABELS } from "../../review-core/types";
+import { useHasActiveGrabSurface } from "../containers";
 import { reviewActions, useReviewState } from "./store";
 import { ReviewThumbnail, storedScreenshotSource } from "./thumbnail";
 import { canSaveComposer } from "./view-model";
@@ -10,6 +11,15 @@ const NO_SCREENSHOT_HINT = "未截图：请安装包含走查截图功能的测�
 const captureSource = (screenshot) => ({
     uri: `data:image/jpeg;base64,${screenshot.jpegBase64}`,
 });
+let sheetFormCache = null;
+const restoreSheetForm = (composer) => {
+    if (sheetFormCache?.composer === composer) {
+        return sheetFormCache.form;
+    }
+    const form = toFormState(composer);
+    sheetFormCache = { composer, form };
+    return form;
+};
 const toFormState = (composer) => {
     if (composer.mode === "create") {
         const draft = composer.draft;
@@ -42,16 +52,25 @@ const toErrorText = (error) => {
     return `保存失败（${error.code}），请重试`;
 };
 export const ComposerSheet = ({ composer, error, }) => {
-    const [form, setForm] = useState(() => toFormState(composer));
+    const [form, setForm] = useState(() => restoreSheetForm(composer));
     const [lastComposer, setLastComposer] = useState(composer);
     const [isSaving, setIsSaving] = useState(false);
     // A fresh composer object means a new sheet; the form resets during render
     // so no stale draft ever flashes.
     if (lastComposer !== composer) {
         setLastComposer(composer);
-        setForm(toFormState(composer));
+        setForm(restoreSheetForm(composer));
         setIsSaving(false);
     }
+    const updateForm = (patch) => {
+        setForm((previous) => {
+            const form = patch(previous);
+            // Stash the typed form against this composer so the sheet can move to
+            // another host (surface deactivation/unmount) without losing the draft.
+            sheetFormCache = { composer, form };
+            return form;
+        });
+    };
     const canSave = composer.mode === "reject"
         ? form.supplement.trim().length > 0
         : canSaveComposer({ description: form.description });
@@ -87,10 +106,10 @@ export const ComposerSheet = ({ composer, error, }) => {
                     if (!isSaving) {
                         reviewActions.closeComposer();
                     }
-                }, style: styles.backdropPress }), _jsx(ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: _jsxs(View, { style: styles.sheet, children: [_jsx(Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? (_jsx(Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : (_jsx(ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), _jsx(Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), _jsx(View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => (_jsx(Pressable, { onPress: () => setForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: _jsx(Text, { style: [
+                }, style: styles.backdropPress }), _jsx(ScrollView, { bounces: false, keyboardShouldPersistTaps: "handled", contentContainerStyle: styles.sheetContent, children: _jsxs(View, { style: styles.sheet, children: [_jsx(Text, { style: styles.sheetTitle, children: toTitle(composer) }), composer.mode === "create" && source === null ? (_jsx(Text, { style: styles.hintText, children: NO_SCREENSHOT_HINT })) : (_jsx(ReviewThumbnail, { source: source, screen: screen, rect: rect })), composer.mode !== "reject" ? (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u63CF\u8FF0" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => updateForm((prev) => ({ ...prev, description: text })), placeholder: "\u63CF\u8FF0\uFF08\u5FC5\u586B\uFF09", style: styles.textInput, textAlignVertical: "top", value: form.description }), _jsx(Text, { style: styles.fieldLabel, children: "\u4FEE\u6539\u8303\u56F4" }), _jsx(View, { style: styles.scopeRow, children: ["local", "shared"].map((scope) => (_jsx(Pressable, { onPress: () => updateForm((prev) => ({ ...prev, scope })), style: [styles.scopeChip, form.scope === scope && styles.scopeChipActive], children: _jsx(Text, { style: [
                                                 styles.scopeChipText,
                                                 form.scope === scope && styles.scopeChipTextActive,
-                                            ], children: SCOPE_LABELS[scope] }) }, scope))) }), _jsx(Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), _jsx(TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => setForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => setForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: toErrorText(error) })), _jsxs(View, { style: styles.actionRow, children: [_jsx(Pressable, { disabled: isSaving, onPress: reviewActions.closeComposer, style: ({ pressed }) => [
+                                            ], children: SCOPE_LABELS[scope] }) }, scope))) }), _jsx(Text, { style: styles.fieldLabel, children: "Figma \u94FE\u63A5" }), _jsx(TextInput, { autoCapitalize: "none", autoCorrect: false, onChangeText: (text) => updateForm((prev) => ({ ...prev, figmaUrl: text })), keyboardType: "url", placeholder: "Figma \u94FE\u63A5\uFF08\u9009\u586B\uFF09", style: styles.textInput, value: form.figmaUrl })] })) : (_jsxs(_Fragment, { children: [_jsx(Text, { style: styles.fieldLabel, children: "\u8865\u5145\u8BF4\u660E" }), _jsx(TextInput, { multiline: true, onChangeText: (text) => updateForm((prev) => ({ ...prev, supplement: text })), placeholder: "\u8865\u5145\u8BF4\u660E\uFF08\u5FC5\u586B\uFF09", style: [styles.textInput, styles.supplementInput], textAlignVertical: "top", value: form.supplement })] })), toErrorText(error) !== null && (_jsx(Text, { style: styles.errorText, children: toErrorText(error) })), _jsxs(View, { style: styles.actionRow, children: [_jsx(Pressable, { disabled: isSaving, onPress: reviewActions.closeComposer, style: ({ pressed }) => [
                                         styles.actionButton,
                                         styles.actionButtonSecondary,
                                         pressed && styles.actionButtonPressed,
@@ -104,11 +123,27 @@ export const ComposerSheet = ({ composer, error, }) => {
                                             (isSaving || !canSave) && styles.actionTextDisabled,
                                         ], children: toSaveLabel(composer) }) })] })] }) })] }));
 };
+/**
+ * Hosts the sheet inside the ACTIVE grab surface's owner tree - an app-owned
+ * RN Modal subtree - as an overlay sibling of the surface view, so picking
+ * inside a presented app dialog never presents a second native Modal.
+ */
+export const SurfaceComposerSlot = () => {
+    const { composer, error, listVisible } = useReviewState();
+    if (listVisible || composer === null) {
+        return null;
+    }
+    return (_jsx(View, { style: styles.surfaceOverlay, children: _jsx(ComposerSheet, { composer: composer, error: error }) }));
+};
 export const ReviewComposer = () => {
     const { composer, error, listVisible } = useReviewState();
-    // iOS cannot present a second Modal over the full-screen list; while the
-    // list is visible the sheet mounts inside the list Modal tree instead.
-    if (listVisible) {
+    const hasActiveGrabSurface = useHasActiveGrabSurface();
+    // iOS drops a second RN Modal presented over an already presented one and
+    // keeps an invisible full-screen host as a touch sink. The sheet therefore
+    // mounts in exactly one host at a time - the list Modal tree while the list
+    // is visible, the active grab surface's overlay otherwise, and this root
+    // Modal only when it is the single host left.
+    if (listVisible || hasActiveGrabSurface) {
         return null;
     }
     return (_jsx(Modal, { animationType: "slide", onRequestClose: reviewActions.closeComposer, transparent: true, visible: composer !== null, children: composer !== null && _jsx(ComposerSheet, { composer: composer, error: error }) }));
@@ -121,6 +156,10 @@ const styles = StyleSheet.create({
     },
     backdropPress: {
         flex: 1,
+    },
+    surfaceOverlay: {
+        ...StyleSheet.absoluteFill,
+        zIndex: 9999,
     },
     sheetContent: {
         justifyContent: "flex-end",

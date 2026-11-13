@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.useIsResolvedGrabSelectionOwner = exports.getResolvedGrabSelectionOwnerId = exports.getResolvedGrabSelectionOwner = exports.getGrabSelectionOwner = exports.setGrabSelectionOwnerActive = exports.clearGrabSelectionOwnerFocus = exports.getFocusedScreenName = exports.setGrabSelectionOwnerName = exports.setGrabSelectionOwnerFocused = exports.unregisterGrabSelectionOwner = exports.registerGrabSelectionOwner = exports.createGrabSelectionOwnerId = void 0;
+exports.useIsActiveGrabSurfaceOwner = exports.useHasActiveGrabSurface = exports.getActiveGrabSurfaceOwnerId = exports.useIsResolvedGrabSelectionOwner = exports.getResolvedGrabSelectionOwnerId = exports.getResolvedGrabSelectionOwner = exports.getGrabSelectionOwner = exports.setGrabSelectionOwnerActive = exports.clearGrabSelectionOwnerFocus = exports.getFocusedScreenName = exports.setGrabSelectionOwnerName = exports.setGrabSelectionOwnerFocused = exports.unregisterGrabSelectionOwner = exports.registerGrabSelectionOwner = exports.createGrabSelectionOwnerId = void 0;
 const react_1 = require("react");
 const react_native_1 = require("react-native");
 const fabric_1 = require("./fabric");
@@ -164,4 +164,21 @@ const useIsResolvedGrabSelectionOwner = (id) => {
     return (0, react_1.useSyncExternalStore)(subscribe, () => (0, exports.getResolvedGrabSelectionOwnerId)() === id, () => false);
 };
 exports.useIsResolvedGrabSelectionOwner = useIsResolvedGrabSelectionOwner;
+const getActiveGrabSurfaceOwnerId = () => {
+    return getActiveSurfaceOwner()?.id ?? null;
+};
+exports.getActiveGrabSurfaceOwnerId = getActiveGrabSurfaceOwnerId;
+/**
+ * True while any grab surface (an app-owned RN Modal subtree) is activated.
+ * Hosting components use it to never present a second native Modal over the
+ * app's presented one.
+ */
+const useHasActiveGrabSurface = () => {
+    return (0, react_1.useSyncExternalStore)(subscribe, () => getActiveSurfaceOwner() !== null, () => false);
+};
+exports.useHasActiveGrabSurface = useHasActiveGrabSurface;
+const useIsActiveGrabSurfaceOwner = (id) => {
+    return (0, react_1.useSyncExternalStore)(subscribe, () => getActiveSurfaceOwner()?.id === id, () => false);
+};
+exports.useIsActiveGrabSurfaceOwner = useIsActiveGrabSurfaceOwner;
 //# sourceMappingURL=containers.js.map
