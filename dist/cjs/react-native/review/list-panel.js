@@ -66,11 +66,16 @@ const ActionButton = ({ disabled, label, onPress, primary, }) => ((0, jsx_runtim
             primary ? styles.actionTextPrimary : styles.actionTextSecondary,
             disabled && styles.actionTextDisabled,
         ], children: label }) }));
+const ReplyText = ({ reply }) => {
+    const [expanded, setExpanded] = (0, react_1.useState)(false);
+    const [overflows, setOverflows] = (0, react_1.useState)(false);
+    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { children: [(0, jsx_runtime_1.jsxs)(react_native_1.Text, { accessible: false, accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants", pointerEvents: "none", style: [styles.itemReply, styles.replyMeasurement], onTextLayout: ({ nativeEvent }) => setOverflows(nativeEvent.lines.length > 3), children: ["\u56DE\u590D\uFF1A", reply] }), (0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemReply, numberOfLines: expanded ? undefined : 3, children: ["\u56DE\u590D\uFF1A", reply] }), overflows && ((0, jsx_runtime_1.jsx)(react_native_1.Pressable, { accessibilityRole: "button", accessibilityState: { expanded }, hitSlop: 8, onPress: () => setExpanded((value) => !value), style: styles.replyToggle, children: (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.itemReply, children: expanded ? "收起" : "展开" }) }))] }));
+};
 const ItemRow = ({ busy, item, onDelete, onEdit, onPass, onReject, onRevert, pending, }) => {
     const source = (0, thumbnail_1.storedScreenshotSource)(item.screenshotUrl);
     const hint = (0, view_model_1.revertHint)(item, busy);
     const reply = latestReplyText(item);
-    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemRow, children: [(0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemBody, children: [(0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemNo, children: ["#", item.no] }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && ((0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemReply, numberOfLines: 3, children: ["\u56DE\u590D\uFF1A", reply] })), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemActions, children: [item.actions.includes("edit") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
+    return ((0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemRow, children: [(0, jsx_runtime_1.jsx)(thumbnail_1.ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemBody, children: [(0, jsx_runtime_1.jsxs)(react_native_1.Text, { style: styles.itemNo, children: ["#", item.no] }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && (0, jsx_runtime_1.jsx)(ReplyText, { reply: reply }, reply), (0, jsx_runtime_1.jsxs)(react_native_1.View, { style: styles.itemActions, children: [item.actions.includes("edit") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && ((0, jsx_runtime_1.jsx)(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && ((0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), (0, jsx_runtime_1.jsx)(react_native_1.Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
 };
 const PairingView = ({ error, stalePairing, }) => {
     const [code, setCode] = (0, react_1.useState)("");
@@ -200,6 +205,17 @@ const styles = react_native_1.StyleSheet.create({
     itemReply: {
         color: "#007AFF",
         fontSize: 12,
+    },
+    replyMeasurement: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        opacity: 0,
+    },
+    replyToggle: {
+        alignSelf: "flex-start",
+        paddingVertical: 4,
     },
     itemActions: {
         flexDirection: "row",

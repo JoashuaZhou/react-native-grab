@@ -62,11 +62,16 @@ const ActionButton = ({ disabled, label, onPress, primary, }) => (_jsx(Pressable
             primary ? styles.actionTextPrimary : styles.actionTextSecondary,
             disabled && styles.actionTextDisabled,
         ], children: label }) }));
+const ReplyText = ({ reply }) => {
+    const [expanded, setExpanded] = useState(false);
+    const [overflows, setOverflows] = useState(false);
+    return (_jsxs(View, { children: [_jsxs(Text, { accessible: false, accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants", pointerEvents: "none", style: [styles.itemReply, styles.replyMeasurement], onTextLayout: ({ nativeEvent }) => setOverflows(nativeEvent.lines.length > 3), children: ["\u56DE\u590D\uFF1A", reply] }), _jsxs(Text, { style: styles.itemReply, numberOfLines: expanded ? undefined : 3, children: ["\u56DE\u590D\uFF1A", reply] }), overflows && (_jsx(Pressable, { accessibilityRole: "button", accessibilityState: { expanded }, hitSlop: 8, onPress: () => setExpanded((value) => !value), style: styles.replyToggle, children: _jsx(Text, { style: styles.itemReply, children: expanded ? "收起" : "展开" }) }))] }));
+};
 const ItemRow = ({ busy, item, onDelete, onEdit, onPass, onReject, onRevert, pending, }) => {
     const source = storedScreenshotSource(item.screenshotUrl);
     const hint = revertHint(item, busy);
     const reply = latestReplyText(item);
-    return (_jsxs(View, { style: styles.itemRow, children: [_jsx(ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), _jsxs(View, { style: styles.itemBody, children: [_jsxs(Text, { style: styles.itemNo, children: ["#", item.no] }), _jsx(Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && (_jsxs(Text, { style: styles.itemReply, numberOfLines: 3, children: ["\u56DE\u590D\uFF1A", reply] })), _jsxs(View, { style: styles.itemActions, children: [item.actions.includes("edit") && (_jsx(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && (_jsx(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && (_jsx(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && (_jsx(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && (_jsx(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && (_jsxs(_Fragment, { children: [_jsx(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), _jsx(Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
+    return (_jsxs(View, { style: styles.itemRow, children: [_jsx(ReviewThumbnail, { source: source, screen: item.screen, rect: item.rect }), _jsxs(View, { style: styles.itemBody, children: [_jsxs(Text, { style: styles.itemNo, children: ["#", item.no] }), _jsx(Text, { style: styles.itemDescription, children: latestRoundText(item) }), reply !== null && _jsx(ReplyText, { reply: reply }, reply), _jsxs(View, { style: styles.itemActions, children: [item.actions.includes("edit") && (_jsx(ActionButton, { disabled: pending, label: "\u4FEE\u6539", onPress: onEdit })), item.actions.includes("delete") && (_jsx(ActionButton, { disabled: pending, label: "\u5220\u9664", onPress: onDelete })), item.actions.includes("pass") && (_jsx(ActionButton, { disabled: pending, label: "\u901A\u8FC7", onPress: onPass, primary: true })), item.actions.includes("reject") && (_jsx(ActionButton, { disabled: pending, label: "\u6253\u56DE", onPress: onReject })), item.actions.includes("revert") && (_jsx(ActionButton, { disabled: pending, label: "\u64A4\u9500", onPress: onRevert })), item.actions.includes("revert") === false && hint !== null && (_jsxs(_Fragment, { children: [_jsx(ActionButton, { disabled: true, label: "\u64A4\u9500", onPress: () => { } }), _jsx(Text, { style: styles.revertHint, children: hint })] }))] })] })] }));
 };
 const PairingView = ({ error, stalePairing, }) => {
     const [code, setCode] = useState("");
@@ -195,6 +200,17 @@ const styles = StyleSheet.create({
     itemReply: {
         color: "#007AFF",
         fontSize: 12,
+    },
+    replyMeasurement: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        opacity: 0,
+    },
+    replyToggle: {
+        alignSelf: "flex-start",
+        paddingVertical: 4,
     },
     itemActions: {
         flexDirection: "row",

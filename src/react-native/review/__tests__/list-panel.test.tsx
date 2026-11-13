@@ -132,6 +132,84 @@ const itemView = (overrides: Partial<DeviceItemView> = {}): DeviceItemView => ({
   ...overrides,
 });
 
+describe("reply expansion", () => {
+  const reply = "A reply with enough content to wrap across several lines.";
+  const renderReply = (): ElementLike => {
+    hooks.order = 0;
+    const content = asElement(asElement(ReviewListPanel()).props.children);
+    const body = asElement((content.props.children as unknown[])[1]);
+    const list = asElement((body.props.children as unknown[])[2]);
+    const groups = (list.props.children as unknown[])[1] as unknown[];
+    const firstGroup = asElement(groups[0]);
+    const rowElement = asElement(((firstGroup.props.children as unknown[])[1] as unknown[])[0]);
+    const row = asElement((rowElement.type as (props: unknown) => unknown)(rowElement.props));
+    const itemBody = asElement((row.props.children as unknown[])[1]);
+    const replyElement = asElement((itemBody.props.children as unknown[])[2]);
+    return typeof replyElement.type === "function"
+      ? asElement((replyElement.type as (props: unknown) => unknown)(replyElement.props))
+      : replyElement;
+  };
+  const descendants = (element: ElementLike): ElementLike[] => {
+    const children = [element.props.children].flat(Infinity) as unknown[];
+    return [
+      element,
+      ...children
+        .filter((child) => child && typeof child === "object" && "props" in child)
+        .flatMap((child) => descendants(asElement(child))),
+    ];
+  };
+  const measure = (element: ElementLike, count: number) => {
+    const text = descendants(element).find((node) => typeof node.props.onTextLayout === "function");
+    expect(text).toBeDefined();
+    (text!.props.onTextLayout as (event: unknown) => void)({
+      nativeEvent: { lines: Array.from({ length: count }, () => ({ text: "line" })) },
+    });
+  };
+  beforeEach(() => {
+    runtime.reviewState = {
+      ...baseState(),
+      paired: true,
+      review: reviewView(),
+      items: [
+        itemView({
+          rounds: [
+            {
+              description: "change",
+              reply,
+              createdAt: "now",
+              submittedAt: null,
+              repliedAt: "now",
+              commits: [],
+            },
+          ],
+        }),
+      ],
+    };
+  });
+  it("has no expansion control when a reply fits in three lines", () => {
+    measure(renderReply(), 3);
+    expect(descendants(renderReply()).filter((node) => node.type === "Pressable")).toHaveLength(0);
+  });
+  it("expands a long reply fully and collapses it back to three lines", () => {
+    measure(renderReply(), 4);
+    let rendered = renderReply();
+    const control = () => descendants(rendered).find((node) => node.type === "Pressable")!;
+    const visible = () =>
+      descendants(rendered).find((node) => node.type === "Text" && !node.props.onTextLayout)!;
+    expect(visible().props.numberOfLines).toBe(3);
+    expect(asElement(control().props.children).props.children).toBe("展开");
+    (control().props.onPress as () => void)();
+    rendered = renderReply();
+    expect(visible().props.numberOfLines).toBeUndefined();
+    expect(visible().props.children).toEqual(["回复：", reply]);
+    expect(asElement(control().props.children).props.children).toBe("收起");
+    (control().props.onPress as () => void)();
+    rendered = renderReply();
+    expect(visible().props.numberOfLines).toBe(3);
+    expect(asElement(control().props.children).props.children).toBe("展开");
+  });
+});
+
 afterEach(() => {
   hooks.values.length = 0;
 });

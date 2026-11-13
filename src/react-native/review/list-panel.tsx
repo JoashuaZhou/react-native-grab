@@ -118,6 +118,42 @@ type ItemRowProps = {
   pending: boolean;
 };
 
+const ReplyText = ({ reply }: { reply: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  return (
+    <View>
+      {/* Measure the untruncated text: iOS may report only the visible lines
+          for a Text with numberOfLines. This copy does not affect row height. */}
+      <Text
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+        style={[styles.itemReply, styles.replyMeasurement]}
+        onTextLayout={({ nativeEvent }) => setOverflows(nativeEvent.lines.length > 3)}
+      >
+        回复：{reply}
+      </Text>
+      <Text style={styles.itemReply} numberOfLines={expanded ? undefined : 3}>
+        回复：{reply}
+      </Text>
+      {overflows && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          hitSlop={8}
+          onPress={() => setExpanded((value) => !value)}
+          style={styles.replyToggle}
+        >
+          <Text style={styles.itemReply}>{expanded ? "收起" : "展开"}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
 const ItemRow = ({
   busy,
   item,
@@ -139,11 +175,7 @@ const ItemRow = ({
       <View style={styles.itemBody}>
         <Text style={styles.itemNo}>#{item.no}</Text>
         <Text style={styles.itemDescription}>{latestRoundText(item)}</Text>
-        {reply !== null && (
-          <Text style={styles.itemReply} numberOfLines={3}>
-            回复：{reply}
-          </Text>
-        )}
+        {reply !== null && <ReplyText key={reply} reply={reply} />}
 
         <View style={styles.itemActions}>
           {item.actions.includes("edit") && (
@@ -423,6 +455,17 @@ const styles = StyleSheet.create({
   itemReply: {
     color: "#007AFF",
     fontSize: 12,
+  },
+  replyMeasurement: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    opacity: 0,
+  },
+  replyToggle: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
   },
   itemActions: {
     flexDirection: "row",
